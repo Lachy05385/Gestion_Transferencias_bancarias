@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba de Transferencias</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1557b0;
+        }
+        .token-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            word-break: break-all;
+            font-family: monospace;
+            display: none;
+        }
+        .token-box.visible {
+            display: block;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏦 Prueba de Transferencias</h1>
+        
+        <!-- Sección de Login -->
+        <div class="section">
+            <h2>🔐 Iniciar Sesión</h2>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="email" value="lazaro1@example.com">
+            </div>
+            <div class="form-group">
+                <label>Contraseña:</label>
+                <input type="password" id="password" value="Lachy05385*">
+            </div>
+            <button onclick="login()" id="loginBtn">Iniciar Sesión</button>
+            
+            <div class="token-box" id="tokenBox">
+                <strong>Token:</strong>
+                <p id="tokenDisplay"></p>
+            </div>
+        </div>
+
+        <!-- Sección de Transferencia (oculta inicialmente) -->
+        <div class="section" id="transferSection" style="display: none;">
+            <h2>📤 Enviar Transferencia</h2>
+            <div class="form-group">
+                <label>Texto de la transferencia:</label>
+                <textarea id="texto" rows="5">Banco Popular de Ahorro: La Transferencia fue completada. Fecha: 12/3/2026 Beneficiario: 9205XXXXXXXX7786 Ordenante: 9205XXXXXXXX9210 Monto: 10000.00 CUP Nro. Transaccion: BR600CNNS7997</textarea>
+            </div>
+            <div class="form-group">
+                <label>Tipo:</label>
+                <select id="tipo">
+                    <option value="RECIBIDA">Recibida</option>
+                    <option value="ENVIADA">Enviada</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Descripción:</label>
+                <input type="text" id="descripcion" placeholder="Opcional">
+            </div>
+            <button onclick="enviarTransferencia()" id="sendBtn">Enviar Transferencia</button>
+        </div>
+
+        <!-- Resultados -->
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+
+        const BASE_URL = 'http://localhost:8000';
+        let token = null;
+
+        // Función de Login
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            console.log('🔐 Intentando login con:', { email, password });
+            
+            // Deshabilitar botón
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Iniciando sesión...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/token`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        'username': email,
+                        'password': password
+                    })
+                });
+
+                const data = await response.json();
+                console.log('📥 Respuesta:', data);
+
+                if (response.ok) {
+                    token = data.access_token;
+                    
+                    // Mostrar token
+                    document.getElementById('tokenDisplay').textContent = token;
+                    document.getElementById('tokenBox').classList.add('visible');
+                    
+                    // Mostrar sección de transferencias
+                    document.getElementById('transferSection').style.display = 'block';
+                    
+                    // Mostrar éxito
+                    mostrarResultado('✅ Login exitoso!', 'success');
+                    
+                    loginBtn.textContent = '✅ Sesión iniciada';
+                } else {
+                    throw new Error(data.detail || 'Error en login');
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                mostrarResultado('❌ Error: ' + error.message, 'error');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Iniciar Sesión';
+            }
+        }
+
+        // Función para enviar transferencia
+        async function enviarTransferencia() {
+            if (!token) {
+                mostrarResultado('❌ Primero debes iniciar sesión', 'error');
+                return;
+            }
+
+            const texto = document.getElementById('texto').value;
+            const tipo = document.getElementById('tipo').value;
+            const descripcion = document.getElementById('descripcion').value;
+            const sendBtn = document.getElementById('sendBtn');
+
+            if (!texto) {
+                mostrarResultado('❌ El texto no puede estar vacío', 'error');
+                return;
+            }
+
+            console.log('📤 Enviando:', { texto, tipo, descripcion });
+            
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Enviando...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/transacciones/recibir`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        'texto': texto,
+                        'tipo': tipo,
+                        'token': token,
+                        'descripcion': descripcion
+                    })
+                });
+
+                const data = await response.json();
+                console.log('📥 Respuesta:', data);
+
+                if (response.ok) {
+                    mostrarResultado(
+                        '✅ Transferencia creada!\n' +
+                        `ID: ${data.id}\n` +
+                        `Monto: ${data.monto} ${data.moneda}\n` +
+                        `Fecha: ${data.fecha}\n` +
+                        `Número: ${data.numero_transaccion}`,
+                        'success'
+                    );
+                } else {
+                    throw new Error(JSON.stringify(data));
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                mostrarResultado('❌ Error: ' + error.message, 'error');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Enviar Transferencia';
+            }
+        }
+
+        // Función para mostrar resultados
+        function mostrarResultado(mensaje, tipo) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result ' + tipo;
+            resultDiv.textContent = mensaje;
+        }
+
+        // Verificar conexión al cargar
+        window.onload = function() {
+            console.log('🚀 Página cargada');
+            fetch(`${BASE_URL}/health`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('✅ Backend conectado:', data);
+                    mostrarResultado('✅ Conectado al backend', 'success');
+                })
+                .catch(error => {
+                    console.error('❌ Backend no disponible:', error);
+                    mostrarResultado('❌ No se pudo conectar al backend. Asegúrate que el servidor esté corriendo en ' + BASE_URL, 'error');
+                });
+        };
+    </script>
+</body>
+</html>
