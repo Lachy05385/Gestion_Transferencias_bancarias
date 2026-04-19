@@ -3,3 +3,4 @@ venv/
 templates/
 *.txt
 *.pdf
+banco.db
