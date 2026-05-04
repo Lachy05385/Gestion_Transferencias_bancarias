@@ -16,12 +16,16 @@ def procesar_mensaje_enzona_avanzado(mensaje):
     
     # Extraer banco
     banco_match = re.search(r'^(ENZONA)', mensaje, re.IGNORECASE)
+    print(banco_match)
+    
+    
     if banco_match:
         resultado["banco"] = banco_match.group(1).upper()
     
     # Extraer importe y moneda (más flexible)
     # Patrones posibles: "Importe: 131.00 CUP" o "Importe:6000.00 CUP"
     importe_match = re.search(r'Importe:\s*([0-9]+\.?[0-9]*)\s*([A-Z]{3})', mensaje, re.IGNORECASE)
+    
     if importe_match:
         resultado["monto"] = float(importe_match.group(1))
         resultado["moneda"] = importe_match.group(2).upper()
@@ -55,6 +59,5 @@ def get_Fecha_inexistente():
 
 mensaje1 = "ENZONA pago recibido, Importe: 131.00 CUP No.: 3AAyFSEr5zCP"
 mensaje2 = "ENZONA transferencia recibida Importe: 6000.00 CUP No.: btW3BGhGpnEH"
-
 
 print(procesar_mensaje_enzona_avanzado(mensaje2))

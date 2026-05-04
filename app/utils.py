@@ -126,6 +126,15 @@ def parse_transaccion_texto(texto: str) -> dict:
     patron_transferencia_std1 = re.search(patron_movil, texto, re.IGNORECASE)
     patron_transferencia_std2 = re.search(patron_bancaria, texto, re.IGNORECASE)
     
+    #DETECTAR PATRON SIN ORDENANTE "Se ha realizado una ....."
+    patron_sin_odenante = r'Se ha realizado una transferencia a la cuenta \d+ de [\d.]+ [A-Z]{3}\. Nro\.?\s*Transaccion [A-Za-z0-9]+\. Fecha: [\d/]+\.'
+    
+    #patron = r'cuenta\s+(\d+).*?de\s+([0-9.]+)\s*([A-Z]{3}).*?Nro\.?\s*Transaccion\s+([A-Za-z0-9]+).*?Fecha:\s*([0-9/]+)'
+    
+    
+
+    
+    
     if bool(re.search(patron_plinea, texto, re.IGNORECASE | re.DOTALL)):
         resultado = procesar_mensaje_plinea(texto)
         return resultado
@@ -277,9 +286,51 @@ def parse_transaccion_texto(texto: str) -> dict:
             
         print(resultado)
         return resultado
+    elif texto.startswith("Se ha realizado"):
+        resultado = procesar_transferencia_sin_ordenante(texto)
+        print("Activando Nueva funcion sin ordenante.... ")
+        return resultado
+        
+    
+    
     else:
         print("Mensaje incorrecto")    
         return "Mensaje Incorrecto"
+
+# CON TEXTO SE HA REALIZADO UNA TRASNSFERENCIA 
+
+def procesar_transferencia_sin_ordenante(mensaje):
+    """
+    Usa una sola expresión regular para extraer todos los datos
+    """
+    resultado = {
+        "banco": "Transferencia",
+        "fecha": "",
+        "beneficiario": "",
+        "ordenante": "****",
+        "monto": 0.0,
+        "moneda": "CUP",
+        "numero_transaccion": "",
+        "concepto": "Transferencia recibida"
+    }
+    
+    # Patrón único que captura todos los campos
+    patron = r'cuenta\s+(\d+).*?de\s+([0-9.]+)\s*([A-Z]{3}).*?Nro\.?\s*Transaccion\s+([A-Za-z0-9]+).*?Fecha:\s*([0-9/]+)'
+    
+    match = re.search(patron, mensaje, re.IGNORECASE | re.DOTALL)
+    
+    if match:
+        resultado["beneficiario"] = match.group(1)
+        resultado["monto"] = float(match.group(2))
+        resultado["moneda"] = match.group(3).upper()
+        resultado["numero_transaccion"] = match.group(4)
+        resultado["fecha"] = match.group(5)
+    
+    return resultado
+    
+    
+    
+    
 def buscarBeneficiario_y_telefono(texto):
     patron = r'telefono\s+(\d+).*?cuenta\s+(\d+)'
 
@@ -337,12 +388,19 @@ def procesar_mensaje_plinea(mensaje):
         resultado["fecha"] = fecha_match.group(1).strip()
         
     
+    
     # Extraer entidad y ponerla en beneficiario (máximo 12 caracteres)
-    entidad_match = re.search(r'Entidad:\s*([^\n]+)', mensaje)
+    entidad_match = re.search(r'Entidad:\s*(.{12})', mensaje)
+    #entidad_match = re.search(r'\([^)]+\)', mensaje)
+    #print("Entidad match -----",entidad_match.group(1).strip())
+    #inicio = entidad_match.group(1).strip().find('(')
+    #fin = entidad_match.group(1).strip().find(')')
+    #print("Entidad match - >",entidad_match)
     if entidad_match:
-        entidad = entidad_match.group(1).strip()
-        # Limitar a 12 caracteres
-        resultado["beneficiario"] = entidad[-12:]
+        entidad = entidad_match.group(1).split()
+        
+        
+        resultado["beneficiario"] = str(entidad)
     
     # Extraer ID de compra y ponerla en ordenante
     id_compra_match = re.search(r'Id Compra:\s*([0-9]+)', mensaje)
@@ -364,6 +422,10 @@ def procesar_mensaje_plinea(mensaje):
     print()
     
     return resultado
+def obtener_beneficiario_p_linea(texto,i,f):
+    entidad = texto[i:f+1]
+    
+    return entidad[:15]
 
 def ordenar_parseo_de_datos(texto: str):
     
@@ -605,7 +667,7 @@ def extraer_numero_transaccion_ocr(texto: str) -> str:
         if match:
             return match.group(1).strip()
     
-    return ""
+    return "xxxxxxx"
 
 def extraer_entidad_ocr(texto: str, texto_lower: str) -> str:
     """
@@ -723,12 +785,13 @@ def extraer_datos_transferencia_de_texto_ocr(texto_ocr: str) -> dict:
         resultado["concepto"] = concepto_match.group(1).strip()[:100]
     
     # 9. Limpiar número de transacción
-    if resultado["numero_transaccion"] and "ELIMINAR" in resultado["numero_transaccion"].upper():
+    if resultado["numero_transaccion"] or len(resultado["numero_transaccion"]) < 4: #and "ELIMINAR" in resultado["numero_transaccion"].upper():
         # Buscar otro código más abajo
         otro_codigo = re.search(r'(\d{4}/\d{5})', texto)
+        print(otro_codigo)
         if otro_codigo:
             resultado["numero_transaccion"] = otro_codigo.group(1)
-    
+    print("Numero de transaccion XX = ",resultado["numero_transaccion"])
     # Asignar valores por defecto si faltan
     if not resultado["beneficiario"]:
         resultado["beneficiario"] = "XXXX"

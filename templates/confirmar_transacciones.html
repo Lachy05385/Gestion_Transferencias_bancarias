@@ -120,7 +120,7 @@
             border-left: 4px solid #ed8936;
         }
         .stat-card.confirmadas {
-            border-left: 4px solid #48bb78;
+            border-left: 4px solid #10b499;
         }
         .stat-card.total {
             border-left: 4px solid #1e3c72;
@@ -429,6 +429,12 @@
                     <label>🔍 Buscar</label>
                     <input type="text" id="searchInput" placeholder="N° Transacción, beneficiario...">
                 </div>
+                <div class="filter-group">
+                    <label>👤 Filtrar por Usuario</label>
+                    <select id="filtroUsuario">
+                        <option value="">Todos los usuarios</option>
+                    </select>
+                </div>
                 <button class="btn-filter" onclick="aplicarFiltros()">🔍 Aplicar Filtros</button>
                 <button class="btn-filter btn-clear" onclick="limpiarFiltros()">🗑️ Limpiar</button>
             </div>
@@ -457,7 +463,8 @@
     </div>
 
     <script>
-        const BASE_URL = 'http://localhost:8000';
+        //const BASE_URL = 'http://localhost:8000';
+        const BASE_URL = window.location.origin;
         let token = null;
         let user = null;
         let tabActual = 'pendientes';
@@ -519,6 +526,174 @@
                 altInput: true,
                 altFormat: "d/m/Y"
             });
+        }
+
+        // PARA CONTADORES
+                // ========== CARGAR USUARIOS DE LA EMPRESA ==========
+        async function cargarUsuariosEmpresa() {
+            try {
+                // Crear el select si no existe
+                if (!document.getElementById('filtroUsuario')) {
+                    crearSelectUsuarios();
+                }
+                
+                const response = await fetch(`${BASE_URL}/empresa/usuarios`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const usuarios = await response.json();
+                    const selectUsuario = document.getElementById('filtroUsuario');
+                    
+                    console.log('Usuarios recibidos:', usuarios);
+                    
+                    if (selectUsuario) {
+                        selectUsuario.innerHTML = '<option value="">📋 Todos los usuarios</option>';
+                        
+                        for (const u of usuarios) {
+                            selectUsuario.innerHTML += `<option value="${u.id}">👤 ${u.nombre} ${u.apellido} (${u.email})</option>`;
+                        }
+                        
+                        console.log('✅ Select llenado con', usuarios.length, 'usuarios');
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando usuarios:', error);
+            }
+        }
+
+        // ========== CARGAR TRANSACCIONES (EMPLEANDO EL NUEVO ENDPOINT) ==========
+        async function cargarTransacciones() {
+            if (!token) return;
+
+            const selectUsuario = document.getElementById('filtroUsuario');
+            
+            // 👈 Debug: ver qué hay en el select
+            console.log('Select de usuarios:', selectUsuario);
+            console.log('Opciones del select:', selectUsuario?.innerHTML);
+
+            // 👈 Obtener el valor UNA SOLA VEZ
+            
+            const usuarioId = selectUsuario ? selectUsuario.value : '';
+            
+            console.log('🔍 Usuario seleccionado:', usuarioId);  // 👈 Debug
+            
+            const estado = document.getElementById('filtroEstado')?.value || '';
+            const fechaInicio = document.getElementById('fechaInicio')?.value || '';
+            const fechaFin = document.getElementById('fechaFin')?.value || '';
+            
+            const loadingDiv = document.getElementById('loadingState');
+            const tableContainer = document.getElementById('tableContainer');
+            
+            if (loadingDiv) loadingDiv.style.display = 'block';
+            if (tableContainer) tableContainer.innerHTML = '';
+
+            try {
+                const params = new URLSearchParams();
+                
+                // 👈 Solo agregar si hay valor y no es string vacío
+                if (usuarioId && usuarioId !== '') {
+                    params.append('usuario_id', usuarioId);
+                }
+                if (estado) params.append('estado', estado);
+                if (fechaInicio) params.append('fecha_inicio', fechaInicio);
+                if (fechaFin) params.append('fecha_fin', fechaFin);
+                
+                params.append('skip', '0');
+                params.append('limit', '500');
+                
+                // 👇 Usar el endpoint para contador
+                const url = `${BASE_URL}/transacciones/empresa?${params.toString()}`;
+                console.log('📤 URL:', url);
+                
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error al cargar transacciones');
+                }
+
+                let transacciones = await response.json();
+                console.log('📊 Transacciones recibidas:', transacciones.length);
+                console.log(transacciones)
+                // Ordenar por fecha descendente
+                transacciones.sort((a, b) => {
+                    const fechaA = a.fecha ? a.fecha.split('/').reverse().join('-') : '';
+                    const fechaB = b.fecha ? b.fecha.split('/').reverse().join('-') : '';
+                    return fechaB.localeCompare(fechaA);
+                });
+                
+                mostrarTabla(transacciones);
+
+            } catch (error) {
+                console.error('Error:', error);
+                if (tableContainer) {
+                    tableContainer.innerHTML = `<div class="empty-message">❌ Error: ${error.message}</div>`;
+                }
+            } finally {
+                if (loadingDiv) loadingDiv.style.display = 'none';
+            }
+        }
+
+        // ========== MOSTRAR TABLA CON USUARIO PROCESADOR ==========
+        function mostrarTabla(transacciones) {
+            const tableContainer = document.getElementById('tableContainer');
+            
+            if (transacciones.length === 0) {
+                tableContainer.innerHTML = `<div class="empty-message">📭 No hay transacciones para mostrar</div>`;
+                return;
+            }
+            
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>N° Transacción</th>
+                            <th>Usuario que Procesó</th>
+                            <th>Beneficiario</th>
+                            <th>Ordenante</th>
+                            <th>Monto</th>
+                            <th>Moneda</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            for (const t of transacciones) {
+                const estadoClass = t.estado === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada';
+                const usuarioNombre = t.usuario ? `${t.usuario.nombre} ${t.usuario.apellido}` : (t.usuario_id || '-');
+                
+                html += `
+                    <tr>
+                        <td>${t.fecha || '-'}</td>
+                        <td><strong>${t.numero_transaccion || '-'}</strong></td>
+                        <td>${usuarioNombre}</td> <!-- 👈 Quién procesó -->
+                        <td>${t.beneficiario || '-'}</td>
+                        <td>${t.ordenante || '-'}</td>
+                        <td><strong>${(t.monto || 0).toFixed(2)}</strong> ${t.moneda}</td>
+                        <td>${t.moneda}</td>
+                        <td><span class="badge ${estadoClass}">${t.estado}</span></td>
+                        <td>
+                            ${t.estado === 'PENDIENTE' ? 
+                                `<button class="btn-confirmar" onclick="confirmarTransaccion(${t.id})">✅ Confirmar</button>` : 
+                                `<span style="color:#48bb78;">✓ Confirmada</span>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            tableContainer.innerHTML = html;
         }
 
         // ========== CARGAR TRANSACCIONES ==========
@@ -691,7 +866,7 @@
                     // Actualizar localmente el estado
                     const transaccion = transaccionesGlobal.find(t => t.id === id);
                     if (transaccion) {
-                        transaccion.estado = 'CONFIRMADA';
+                        transaccion.estado = 'confirmada';
                         transaccion.fecha_confirmacion = new Date().toISOString();
                     }
                     
@@ -718,16 +893,16 @@
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ estado: 'PENDIENTE' })
+                    body: JSON.stringify({ estado: 'pendiente'})
                 });
-                
+                console.log(response.body)
                 if (response.ok) {
                     mostrarMensaje('✅ Transacción revertida a PENDIENTE', 'exito');
                     
                     // Actualizar localmente el estado
                     const transaccion = transaccionesGlobal.find(t => t.id === id);
                     if (transaccion) {
-                        transaccion.estado = 'PENDIENTE';
+                        transaccion.estado = 'pendiente';
                         transaccion.fecha_confirmacion = null;
                     }
                     
@@ -743,45 +918,10 @@
                 mostrarMensaje(`❌ Error: ${error.message}`, 'error');
             }
         }
-        async function revertirTransaccion(id) {
-            const confirmar = confirm('¿Revertir esta transacción a PENDIENTE? Esto significa que aún no aparece en el estado de cuenta.');
-            if (!confirmar) return;
-            
-            try {
-                const response = await fetch(`${BASE_URL}/transacciones/${id}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ estado: 'PENDIENTE' })
-                });
-                
-                if (response.ok) {
-                    mostrarMensaje('✅ Transacción revertida a PENDIENTE', 'exito');
-                    
-                    // Actualizar localmente el estado
-                    const transaccion = transaccionesGlobal.find(t => t.id === id);
-                    if (transaccion) {
-                        transaccion.estado = 'PENDIENTE';
-                        transaccion.fecha_confirmacion = null;
-                    }
-                    
-                    // Actualizar estadísticas y tabla
-                    calcularEstadisticas();
-                    mostrarTabla();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Error al revertir');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje(`❌ Error: ${error.message}`, 'error');
-            }
-        }
+        
         function mostrarMensaje(mensaje, tipo) {
             const msgDiv = document.createElement('div');
-            msgDiv.textContent = mensaje;
+            msgDiv.textContent = mensaje;http://localhost:8000/eliminar-transaccion
             msgDiv.className = `mensaje-flotante mensaje-${tipo === 'exito' ? 'exito' : 'error'}`;
             document.body.appendChild(msgDiv);
             setTimeout(() => msgDiv.remove(), 3000);
@@ -811,7 +951,8 @@
             await getUserProfile();
             if (user) {
                 initDatePickers();
-                await aplicarFiltros();
+                await cargarUsuariosEmpresa();  // 👈 Cargar usuarios primero
+                await cargarTransacciones();     // 👈 Luego cargar transacciones
             }
         }
 

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <title>Prueba de Transferencias</title>
     <style>
         body {
@@ -87,6 +88,75 @@
             opacity: 0.7;
             cursor: not-allowed;
         }
+        /* Modal para la cámara */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-modal:hover {
+            color: #f56565;
+        }
+
+        .btn-camera {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .btn-camera:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #a0aec0;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -126,6 +196,31 @@
                     <option value="ENVIADA">Enviada</option>
                 </select>
             </div>
+
+            <!-- Botón para abrir cámara -->
+            <button type="button" class="btn-camera" onclick="abrirScannerQR()">
+                📷 Escanear QR del Carné de Identidad
+            </button>
+
+            <!-- Modal para la cámara -->
+            <div id="qrModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📷 Escanear QR del Carné de Identidad</h3>
+                        <button class="close-modal" onclick="cerrarScannerQR()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="qr-reader" style="width: 100%;"></div>
+                        <div id="qr-result" style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 8px; display: none;">
+                            <strong>📝 Texto del QR:</strong>
+                            <p id="qr-text" style="word-break: break-all;"></p>
+                            <button class="btn-primary" onclick="usarTextoQR()">✅ Usar este texto</button>
+                            <button class="btn-secondary" onclick="cerrarScannerQR()">❌ Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label>Descripción:</label>
                 <input type="text" id="descripcion" placeholder="Opcional">
@@ -139,7 +234,10 @@
 
     <script>
 
-        const BASE_URL = 'http://localhost:8000';
+        //const BASE_URL = 'http://localhost:8000';
+        const BASE_URL = window.location.origin;
+        alert("Ruta "+ BASE_URL )
+        //devuelve la ruta que estas usando
         let token = null;
 
         // Función de Login
@@ -155,6 +253,10 @@
             loginBtn.textContent = 'Iniciando sesión...';
             
             try {
+
+                const BASE_URL = window.location.origin;
+                console.log('📍 URL base:', BASE_URL);
+
                 const response = await fetch(`${BASE_URL}/token`, {
                     method: 'POST',
                     headers: {
@@ -170,29 +272,39 @@
                 console.log('📥 Respuesta:', data);
 
                 if (response.ok) {
-                    token = data.access_token;
+                    // Guardar token
+                    localStorage.setItem('token', data.access_token);
                     
-                    // Mostrar token
-                    document.getElementById('tokenDisplay').textContent = token;
-                    document.getElementById('tokenBox').classList.add('visible');
+                    // Obtener el perfil para saber el rol
+                    const profileRes = await fetch(`${BASE_URL}/perfil`, {
+                        headers: { 'Authorization': `Bearer ${data.access_token}` }
+                    });
+                    const user = await profileRes.json();
+                    console.log('👤 Usuario autenticado:', user);
                     
-                    // Mostrar sección de transferencias
-                    document.getElementById('transferSection').style.display = 'block';
-                    
-                    // Mostrar éxito
-                    mostrarResultado('✅ Login exitoso!', 'success');
-                    
-                    loginBtn.textContent = '✅ Sesión iniciada';
+                    // Redirigir según el rol (usando rutas relativas)
+                    if (user.rol === 'contador') {
+                        window.location.href = '/confirmar';
+                    } else if (user.rol === 'admin') {
+                        window.location.href = '/admin';
+                    } else {
+                        window.location.href = '/capturar';
+                    }
                 } else {
-                    throw new Error(data.detail || 'Error en login');
+                    // Si el login falló, mostrar error
+                    alert('Error de autenticación: ' + (data.detail || 'Credenciales inválidas'));
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Iniciar sesión';
                 }
             } catch (error) {
-                console.error('❌ Error:', error);
-                mostrarResultado('❌ Error: ' + error.message, 'error');
+                console.error('❌ Error de conexión:', error);
+                alert('Error de conexión: Verifica que el servidor esté corriendo');
                 loginBtn.disabled = false;
-                loginBtn.textContent = 'Iniciar Sesión';
+                loginBtn.textContent = 'Iniciar sesión';
             }
         }
+        // refirigir
+        
 
         // Función para enviar transferencia
         async function enviarTransferencia() {
@@ -276,6 +388,165 @@
                     mostrarResultado('❌ No se pudo conectar al backend. Asegúrate que el servidor esté corriendo en ' + BASE_URL, 'error');
                 });
         };
+        let html5QrCode = null;
+        let ultimoTextoQR = null;
+
+        async function abrirScannerQR() {
+            const modal = document.getElementById('qrModal');
+            modal.style.display = 'flex';
+            
+            // Verificar si el navegador soporta la cámara
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Tu navegador no soporta acceso a la cámara");
+                cerrarScannerQR();
+                return;
+            }
+            
+            try {
+                // Probar acceso a la cámara primero
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop()); // Liberar temporalmente
+                console.log("✅ Acceso a cámara permitido");
+            } catch (err) {
+                console.error("❌ Error de cámara:", err);
+                alert("No se pudo acceder a la cámara. Verifica los permisos.");
+                cerrarScannerQR();
+                return;
+            }
+            
+            // Inicializar el escáner
+            html5QrCode = new Html5Qrcode("qr-reader");
+            
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+            
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText, decodedResult) => {
+                    console.log("✅ QR detectado:", decodedText);
+                    ultimoTextoQR = decodedText;
+                    document.getElementById('qr-text').textContent = decodedText;
+                    document.getElementById('qr-result').style.display = 'block';
+                    
+                    if (html5QrCode) {
+                        html5QrCode.stop();
+                        html5QrCode = null;
+                    }
+                },
+                (errorMessage) => {
+                    // No mostrar errores continuos
+                    // console.log("Escaneando...");
+                }
+            ).catch(err => {
+                console.error("❌ Error al iniciar escáner:", err);
+                alert("Error al iniciar la cámara: " + err.message);
+                cerrarScannerQR();
+            });
+        }
+        function extraerNombreDelQR(qrText) {
+            // Ejemplo 1: Si el QR tiene formato "Nombre: Juan Pérez"
+            const nombreMatch = qrText.match(/Nombre:\s*([^|]+)/i);
+            if (nombreMatch) {
+                return nombreMatch[1].trim();
+            }
+            
+            // Ejemplo 2: Si el QR tiene formato "NOMBRE: Juan Pérez"
+            const nombreMatch2 = qrText.match(/NOMBRE:\s*([^|]+)/i);
+            if (nombreMatch2) {
+                return nombreMatch2[1].trim();
+            }
+            
+            // Ejemplo 3: Si el QR tiene solo el nombre (sin formato)
+            // Asumimos que es el texto completo
+            return qrText;
+        }
+
+        // Modificar la función usarTextoQR
+        function usarTextoQR() {
+            if (ultimoTextoQR) {
+                // Extraer solo el nombre del QR
+                const nombrePersona = extraerNombreDelQR(ultimoTextoQR);
+                
+                const descripcionField = document.getElementById('descripcion');
+                const textoActual = descripcionField.value;
+                
+                if (textoActual) {
+                    descripcionField.value = textoActual + " | Pagador: " + nombrePersona;
+                } else {
+                    descripcionField.value = "Pagador: " + nombrePersona;
+                }
+                
+                cerrarScannerQR();
+                mostrarMensajeTemporal(`✅ Nombre "${nombrePersona}" agregado a la descripción`, "success");
+            }
+        }
+
+        function cerrarScannerQR() {
+            if (html5QrCode) {
+                html5QrCode.stop();
+                html5QrCode = null;
+            }
+            document.getElementById('qrModal').style.display = 'none';
+            document.getElementById('qr-result').style.display = 'none';
+            document.getElementById('qr-text').textContent = '';
+            ultimoTextoQR = null;
+        }
+
+        function usarTextoQR() {
+            if (ultimoTextoQR) {
+                // Agregar el texto QR al campo de descripción
+                const descripcionField = document.getElementById('descripcion');
+                const textoActual = descripcionField.value;
+                
+                // Si ya hay texto, agregar con separador
+                if (textoActual) {
+                    descripcionField.value = textoActual + " | QR: " + ultimoTextoQR;
+                } else {
+                    descripcionField.value = "QR: " + ultimoTextoQR;
+                }
+                
+                // Cerrar el modal
+                cerrarScannerQR();
+                
+                // Mostrar mensaje de éxito
+                mostrarMensajeTemporal("✅ Texto QR agregado a la descripción", "success");
+            }
+        }
+
+        function mostrarMensajeTemporal(mensaje, tipo) {
+            const msgDiv = document.createElement('div');
+            msgDiv.textContent = mensaje;
+            msgDiv.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                background: ${tipo === 'success' ? '#48bb78' : '#f56565'};
+                color: white;
+                border-radius: 8px;
+                font-weight: 600;
+                z-index: 1000;
+                animation: fadeInOut 3s ease-in-out;
+            `;
+            document.body.appendChild(msgDiv);
+            setTimeout(() => msgDiv.remove(), 3000);
+        }
+
+        // Agregar animación CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translateY(20px); }
+                15% { opacity: 1; transform: translateY(0); }
+                85% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(20px); }
+            }
+        `;
+        document.head.appendChild(style)
     </script>
 </body>
 </html>

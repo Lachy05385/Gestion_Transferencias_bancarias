@@ -24,13 +24,15 @@ def get_users(db: Session, skip: int = 0, limit: int = 100):
 def create_user(db: Session, user: schemas.UserCreate):
     """Crea un nuevo usuario"""
     hashed_password = get_password_hash(user.password)
-    
+    rol_valido = user.rol if user.rol in ["usuario", "contador", "admin"] else "usuario"
     db_user = models.Usuario(
         email=user.email,
         nombre=user.nombre,
         apellido=user.apellido,
         hashed_password=hashed_password,
-        esta_activo=True
+        esta_activo=True,
+        rol = rol_valido
+        
     )
     
     db.add(db_user)

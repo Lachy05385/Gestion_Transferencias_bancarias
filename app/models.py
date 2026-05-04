@@ -5,6 +5,24 @@ from datetime import datetime
 import enum
 from .database import Base
 
+
+class Empresa(Base):
+    __tablename__ = "empresas"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, nullable=False)
+    nit = Column(String, unique=True, nullable=False)  # NIT o identificación
+    direccion = Column(String, nullable=True)
+    telefono = Column(String, nullable=True)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    
+    # Relaciones
+    usuarios = relationship("Usuario", back_populates="empresa")
+    transacciones = relationship("Transaccion", back_populates="empresa")
+
+
+
+
 class TipoTransaccion(str, enum.Enum):
     ENVIADA = "enviada"
     RECIBIDA = "recibida"
@@ -32,16 +50,21 @@ class Usuario(Base):
     apellido = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     esta_activo = Column(Boolean, default=True)
+    rol = Column(String, default="usuario")  # 👈 NUEVO: "admin" o "usuario"
+    empresa_id = Column(Integer, ForeignKey("empresas.id"), nullable=False)  # 👈 NUEVO
     fecha_creacion = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relación con transacciones
+    empresa = relationship("Empresa", back_populates="usuarios")
     transacciones = relationship("Transaccion", back_populates="usuario")
+    opiniones = relationship("Opinion", back_populates="usuario", cascade="all, delete-orphan")
 
 class Transaccion(Base):
     __tablename__ = "transacciones"
     
     id = Column(Integer, primary_key=True, index=True)
-    
+    empresa_id = Column(Integer, ForeignKey("empresas.id"), nullable=False)  # 👈 NUEVO
+   
     # Datos del usuario
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     
@@ -65,7 +88,9 @@ class Transaccion(Base):
     fecha_confirmacion = Column(DateTime(timezone=True), nullable=True)
     
     # Relación
+    empresa = relationship("Empresa", back_populates="transacciones")
     usuario = relationship("Usuario", back_populates="transacciones")
+   
 
 class Etiqueta(Base):
     __tablename__ = "etiquetas"
@@ -83,6 +108,23 @@ class TransaccionEtiqueta(Base):
     
     transaccion_id = Column(Integer, ForeignKey("transacciones.id"), primary_key=True)
     etiqueta_id = Column(Integer, ForeignKey("etiquetas.id"), primary_key=True)
+
+
+# models.py - Agregar esta clase
+
+class Opinion(Base):
+    __tablename__ = "opiniones"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    usuario_nombre = Column(String, nullable=False)
+    titulo = Column(String, nullable=False)
+    mensaje = Column(String, nullable=False)
+    puntuacion = Column(Integer, default=5)  # 1-5 estrellas
+    fecha = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relación
+    usuario = relationship("Usuario", back_populates="opiniones")
 
 # Crear las tablas
 def create_tables():
