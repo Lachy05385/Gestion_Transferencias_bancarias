@@ -1,0 +1,18 @@
+Banco Popular de Ahorro: Pago completado. 
+ Fecha: 13/3/2026 
+ Entidad: Lazaro AlbertoSaavedraGomez(Photo Laz 
+ Id Compra: 5710140502 
+ Importe: 100.00 CUP 
+ Importe Pagado: 94.00 CUP 
+ Nro. Transaccion: BR600CUUQU997.
+
+
+
+
+Banco Bandec: Pago completado. 
+ Fecha: 23/3/2026 
+ Entidad: UEB LA IDEAL  (UEB LA IDEAL) 
+ Id Compra: 7276400592 
+ Importe: 560.00 CUP 
+ Importe Pagado: 526.40 CUP 
+ Nro. Transaccion: KW600KTOF6999.
