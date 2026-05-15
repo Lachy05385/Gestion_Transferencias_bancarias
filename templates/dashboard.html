@@ -6,6 +6,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <title>📊 Panel de Transacciones - Gestor Bancario</title>
     <style>
         * {
@@ -451,46 +453,37 @@
 
     <script>
         //const BASE_URL = 'http://localhost:8000';
+
         const BASE_URL = window.location.origin;
         let token = null;
         let user = null;
-        let transacciones = [];
+        let todasLasTransacciones = [];
+        let transaccionesFiltradas = [];
         let tabActual = 'todas';
 
-        // ========== FUNCIONES DE AUTENTICACIÓN ==========
-        
+        // ========== AUTENTICACIÓN ==========
         function getTokenFromUrl() {
             const params = new URLSearchParams(window.location.search);
             return params.get('token');
         }
-
-        function saveToken(token) {
-            localStorage.setItem('token', token);
-        }
-
         function getToken() {
             const urlToken = getTokenFromUrl();
             if (urlToken) {
-                saveToken(urlToken);
+                localStorage.setItem('token', urlToken);
                 return urlToken;
             }
             return localStorage.getItem('token');
         }
-
         async function getUserProfile() {
-            const token = getToken();
+            token = getToken();
             if (!token) {
                 window.location.href = '/test';
                 return null;
             }
-
             try {
                 const response = await fetch(`${BASE_URL}/perfil`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
-
                 if (response.ok) {
                     user = await response.json();
                     document.getElementById('userName').textContent = `${user.nombre} ${user.apellido}`;
@@ -501,575 +494,435 @@
                     return null;
                 }
             } catch (error) {
-                console.error('Error obteniendo perfil:', error);
+                console.error('Error perfil:', error);
                 window.location.href = '/test';
                 return null;
             }
         }
-
         function logout() {
             localStorage.removeItem('token');
             window.location.href = '/test';
         }
 
-        // ========== FUNCIONES DE TRANSACCIONES ==========
-
-        async function aplicarFiltros() {
-            const token = getToken();
-            if (!token) return;
-
-            // Obtener valores de los filtros
-            const fechaInicio = document.getElementById('fechaInicio').value;
-            const fechaFin = document.getElementById('fechaFin').value;
-            const filtroBanco = document.getElementById('filtroBanco').value;
-            const filtroMoneda = document.getElementById('filtroMoneda').value;
-            const filtroEstado = document.getElementById('filtroEstado').value;
-            const tipo = tabActual === 'todas' ? null : tabActual;
-            
-            const loadingDiv = document.getElementById('loadingState');
-            const tableContainer = document.getElementById('tableContainer');
-            
-            loadingDiv.style.display = 'block';
-            tableContainer.innerHTML = '';
-
-            try {
-                // Construir URL con parámetros
-                const params = new URLSearchParams();
-
-                
-                
-                if (fechaInicio) params.append('fecha_inicio', fechaInicio);
-                if (fechaFin) params.append('fecha_fin', fechaFin);
-                if (filtroBanco) params.append('banco', filtroBanco);
-                if (filtroMoneda) params.append('moneda', filtroMoneda);
-                if (filtroEstado) params.append('estado', filtroEstado);
-                if (tipo && tabActual !== 'todas') params.append('tipo', tipo);
-                
-                // 👇 USAR EL MISMO ENDPOINT PARA TODO
-                const url = `${BASE_URL}/transacciones/?${params.toString()}`;
-                const response = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Error al cargar transacciones');
-                }
-
-                let transacciones = await response.json();
-                
-                // Filtro por moneda (si el backend no lo soporta)
-                if (filtroMoneda) {
-                    transacciones = transacciones.filter(t => t.moneda === filtroMoneda);
-                }
-                
-                // Guardar en variable global
-                window.transaccionesGlobal = transacciones;
-                
-                // Calcular estadísticas
-                calcularEstadisticas();
-                
-                // Mostrar según tab actual
-                mostrarTabla();
-
-            } catch (error) {
-                console.error('Error:', error);
-                tableContainer.innerHTML = `
-                    <div class="empty-message">
-                        ❌ Error al cargar las transacciones<br>
-                        <small>${error.message}</small>
-                    </div>
-                `;
-            } finally {
-                loadingDiv.style.display = 'none';
+        // ========== FUNCIONES DE FECHA ==========
+        function normalizarFecha(fechaStr) {
+            if (!fechaStr) return '';
+            if (/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) return fechaStr;
+            const partes = fechaStr.split('/');
+            if (partes.length === 3) {
+                const [dia, mes, anio] = partes;
+                return `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
             }
+            return fechaStr;
+        }
+        function formatearFecha(fechaStr) {
+            if (!fechaStr) return '-';
+            if (fechaStr.includes('/')) return fechaStr;
+            const partes = fechaStr.split('-');
+            if (partes.length === 3) {
+                const [anio, mes, dia] = partes;
+                return `${dia}/${mes}/${anio}`;
+            }
+            return fechaStr;
         }
 
-        // Función para limpiar filtros
-        function limpiarFiltros() {
-            document.getElementById('fechaInicio').value = '';
-            document.getElementById('fechaFin').value = '';
-            document.getElementById('filtroBanco').value = '';
-            document.getElementById('filtroMoneda').value = '';
-            document.getElementById('filtroEstado').value = '';
-            
-            // Recargar sin filtros
-            aplicarFiltros();
+        // ========== DATE PICKERS ==========
+        function initDatePickers() {
+            flatpickr("#fechaInicio", { locale: "es", dateFormat: "d/m/Y", allowInput: true });
+            flatpickr("#fechaFin", { locale: "es", dateFormat: "d/m/Y", allowInput: true });
         }
-                
-        
-        
-        
-        
-        async function cargarTransacciones() {
-            const token = getToken();
+
+        // ========== CARGAR TODAS LAS TRANSACCIONES ==========
+        async function cargarTodasTransacciones() {
+            token = getToken();
+            if (!token) return [];
+            const url = `${BASE_URL}/transacciones/?skip=0&limit=2000`;
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Error al cargar transacciones');
+            let data = await response.json();
+            return data.map(t => ({
+                ...t,
+                tipo: t.tipo || (t.monto > 0 ? 'recibida' : 'enviada'),
+                fechaOriginal: normalizarFecha(t.fecha),
+                fecha: formatearFecha(normalizarFecha(t.fecha))
+            }));
+        }
+
+        // ========== APLICAR FILTROS ==========
+        async function aplicarFiltros() {
+            token = getToken();
             if (!token) return;
 
             const loadingDiv = document.getElementById('loadingState');
             const tableContainer = document.getElementById('tableContainer');
-            
             loadingDiv.style.display = 'block';
             tableContainer.innerHTML = '';
 
             try {
-                const fechaInicio = document.getElementById('fechaInicio').value;
-                const fechaFin = document.getElementById('fechaFin').value;
-                const filtroBanco = document.getElementById('filtroBanco').value;
-                const filtroMoneda = document.getElementById('filtroMoneda').value;
-
-                // Construir URL con parámetros
-                let url = `${BASE_URL}/transacciones/?`;
-                const params = [];
-                
-                if (fechaInicio && fechaFin) {
-                    // Usar el endpoint por fecha si está disponible
-                    url = `${BASE_URL}/transacciones/recibidas/por-fecha?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
-                } else {
-                   // if (filtroBanco) params.push(`banco=${encodeURIComponent(filtroBanco)}`);
-                }
-                
-                const finalUrl = params.length ? `${BASE_URL}/transacciones/?${params.join('&')}` : `${BASE_URL}/transacciones/`;
-                
-                let response = await fetch(finalUrl, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Error al cargar transacciones');
+                if (todasLasTransacciones.length === 0) {
+                    todasLasTransacciones = await cargarTodasTransacciones();
+                    console.log('📦 Total transacciones cargadas:', todasLasTransacciones.length);
                 }
 
-                let allTransacciones = await response.json();
-                
-                // Aplicar filtros adicionales en cliente
-                transacciones = allTransacciones.filter(t => {
-                    if (filtroBanco && !t.banco.toLowerCase().includes(filtroBanco.toLowerCase())) return false;
-                    if (filtroMoneda && t.moneda !== filtroMoneda) return false;
+                let fechaInicioStr = document.getElementById('fechaInicio')?.value || '';
+                let fechaFinStr = document.getElementById('fechaFin')?.value || '';
+                const moneda = document.getElementById('filtroMoneda')?.value || '';
+                const estado = document.getElementById('filtroEstado')?.value || '';
+
+                const fechaInicio = normalizarFecha(fechaInicioStr);
+                const fechaFin = normalizarFecha(fechaFinStr);
+
+                let filtradas = todasLasTransacciones.filter(t => {
+                    const fechaTransaccion = t.fechaOriginal || '';
+                    if (fechaInicio && fechaTransaccion < fechaInicio) return false;
+                    if (fechaFin && fechaTransaccion > fechaFin) return false;
+                    if (moneda && t.moneda !== moneda) return false;
+                    if (estado && t.estado !== estado) return false;
+                    if (tabActual === 'enviadas' && t.tipo !== 'enviada') return false;
+                    if (tabActual === 'recibidas' && t.tipo !== 'recibida') return false;
                     return true;
                 });
 
-
-                // Calcular estadísticas
-                calcularEstadisticas();
-                
-                // Mostrar según tab actual
-                mostrarTabla();
-
+                filtradas.sort((a, b) => (b.fechaOriginal || '').localeCompare(a.fechaOriginal || ''));
+                transaccionesFiltradas = filtradas;
+                actualizarEstadisticas();
+                renderizarTabla();
             } catch (error) {
-                console.error('Error:', error);
-                tableContainer.innerHTML = `
-                    <div class="empty-message">
-                        ❌ Error al cargar las transacciones<br>
-                        <small>${error.message}</small>
-                    </div>
-                `;
+                console.error(error);
+                tableContainer.innerHTML = `<div class="empty-message">❌ Error: ${error.message}</div>`;
             } finally {
                 loadingDiv.style.display = 'none';
             }
         }
 
-        function calcularEstadisticas() {
-            // 👇 Usar la variable global, no la local
-            const todasTransacciones = window.transaccionesGlobal || [];
-            
-            // Aplicar filtro de tab actual para las estadísticas
-            let transacciones = todasTransacciones;
-            if (tabActual === 'enviadas') {
-                transacciones = todasTransacciones.filter(t => t.tipo === 'enviada');
-            } else if (tabActual === 'recibidas') {
-                transacciones = todasTransacciones.filter(t => t.tipo === 'recibida');
-            }
-            
-            const enviadas = transacciones.filter(t => t.tipo === 'enviada');
-            const recibidas = transacciones.filter(t => t.tipo === 'recibida');
-            
+        // ========== ESTADÍSTICAS ==========
+        function actualizarEstadisticas() {
+            const enviadas = transaccionesFiltradas.filter(t => t.tipo === 'enviada');
+            const recibidas = transaccionesFiltradas.filter(t => t.tipo === 'recibida');
             const totalEnviadas = enviadas.reduce((sum, t) => sum + (t.monto || 0), 0);
             const totalRecibidas = recibidas.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const pendientes = transacciones.filter(t => t.estado === 'PENDIENTE').length;
-            
-            // Actualizar el DOM
-            const totalEnviadasEl = document.getElementById('totalEnviadas');
-            const totalRecibidasEl = document.getElementById('totalRecibidas');
-            const balanceEl = document.getElementById('balance');
-            const pendientesEl = document.getElementById('pendientes');
-            
-            if (totalEnviadasEl) totalEnviadasEl.textContent = totalEnviadas.toFixed(2);
-            if (totalRecibidasEl) totalRecibidasEl.textContent = totalRecibidas.toFixed(2);
-            if (balanceEl) balanceEl.textContent = (totalRecibidas - totalEnviadas).toFixed(2);
-            if (pendientesEl) pendientesEl.textContent = pendientes;
-            
-            console.log('📊 Estadísticas actualizadas:', {
-                totalEnviadas: totalEnviadas.toFixed(2),
-                totalRecibidas: totalRecibidas.toFixed(2),
-                balance: (totalRecibidas - totalEnviadas).toFixed(2),
-                pendientes: pendientes
-            });
+            const pendientes = transaccionesFiltradas.filter(t => t.estado === 'PENDIENTE').length;
+
+            document.getElementById('totalEnviadas').textContent = totalEnviadas.toFixed(2);
+            document.getElementById('totalRecibidas').textContent = totalRecibidas.toFixed(2);
+            document.getElementById('balance').textContent = (totalRecibidas - totalEnviadas).toFixed(2);
+            document.getElementById('pendientes').textContent = pendientes;
         }
 
-        function mostrarTabla() {
-            const tableContainer = document.getElementById('tableContainer');
-            
-            // Usar las transacciones filtradas globalmente
-            let transacciones = window.transaccionesGlobal || [];
-            
-            // Filtrar según la tab actual (Todas/Enviadas/Recibidas)
-            if (tabActual === 'enviadas') {
-                transacciones = transacciones.filter(t => t.tipo === 'enviada');
-            } else if (tabActual === 'recibidas') {
-                transacciones = transacciones.filter(t => t.tipo === 'recibida');
-            }
-            
-            if (transacciones.length === 0) {
-                tableContainer.innerHTML = `
-                    <div class="empty-message">
-                        📭 No hay transacciones para mostrar<br>
-                        <small>Prueba cambiando los filtros</small>
-                    </div>
-                `;
+        // ========== RENDERIZAR TABLA (CORREGIDA, SIN DUPLICADOS) ==========
+        function renderizarTabla() {
+            const container = document.getElementById('tableContainer');
+            if (!transaccionesFiltradas.length) {
+                container.innerHTML = '<div class="empty-message">📭 No hay transacciones con los filtros actuales</div>';
                 return;
             }
-            
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>N° Transacción</th>
-                            <th>Tipo</th>
-                            <th>Beneficiario</th>
-                            <th>Ordenante</th>
-                            <th>Monto</th>
-                            <th>Moneda</th>
-                            <th>Banco</th>
-                            <th>Estado</th>
-                            <th>Fecha Confirmación</th>
-                           !<-- <th>Confirmar</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            for (const t of transacciones) {
+
+            // Debug: ver la primera transacción
+            console.log('Primera transacción:', transaccionesFiltradas[0]);
+
+            let html = '<table class="transactions-table" style="width:100%; border-collapse: collapse;">';
+            html += '<thead><tr>';
+            html += '<th>Fecha</th><th>N° Transacción</th><th>Tipo</th><th>Beneficiario</th><th>Ordenante</th><th>Monto</th><th>Moneda</th><th>Estado</th><th>Fecha Confirmación</th>';
+            html += '</tr></thead><tbody>';
+
+            for (const t of transaccionesFiltradas) {
                 const tipoClass = t.tipo === 'enviada' ? 'badge-enviada' : 'badge-recibida';
                 const estadoClass = t.estado === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada';
-                const isChecked = t.estado === 'CONFIRMADA';
-                
-                // Formatear fecha de confirmación
-                let fechaConfirmacionHtml = '-';
+                let fechaConfirm = '-';
                 if (t.fecha_confirmacion) {
-                    const fecha = new Date(t.fecha_confirmacion);
-                    fechaConfirmacionHtml = fecha.toLocaleString();
+                    fechaConfirm = new Date(t.fecha_confirmacion).toLocaleString();
                 }
-                
-                html += `
-                    <tr data-id="${t.id}">
-                        <td>${t.fecha || '-'}</td>
-                        <td><strong>${t.numero_transaccion || '-'}</strong></td>
-                        <td><span class="badge ${tipoClass}">${t.tipo === 'enviada' ? '📤 Enviada' : '📥 Recibida'}</span></td>
-                        <td>${t.beneficiario || '-'}</td>
-                        <td>${t.ordenante || '-'}</td>
-                        <td><strong>${t.monto.toFixed(2)}</strong></td>
-                        <td>${t.moneda}</td>
-                        <td>${t.banco || '-'}</td>
-                        <td><span class="badge ${estadoClass}" id="estado-${t.id}">${t.estado}</span></td>
-                        <td>${fechaConfirmacionHtml}</td>
-                        <!-- quitar check -->
-                        <td>
-                            <input type="checkbox" 
-                                class="confirm-checkbox" 
-                                data-id="${t.id}"
-                                ${isChecked ? 'checked disabled' : ''}
-                                ${t.estado === 'CONFIRMADA' ? 'disabled' : ''}
-                                onchange="cambiarEstado(${t.id}, this.checked)">
-                        </td>
-                    </tr>
-                `;
+                html += `<tr>
+                    <td>${t.fecha}</td>
+                    <td><strong>${t.numero_transaccion || '-'}</strong></td>
+                    <td><span class="badge ${tipoClass}">${t.tipo === 'enviada' ? '📤 Enviada' : '📥 Recibida'}</span></td>
+                    <td>${t.beneficiario || '-'}</td>
+                    <td>${t.ordenante || '-'}</td>
+                    <td><strong>${(t.monto || 0).toFixed(2)}</strong></td>
+                    <td>${t.moneda}</td>
+                    <td><span class="badge ${estadoClass}">${t.estado}</span></td>
+                    <td>${fechaConfirm}</td>
+                </tr>`;
             }
+            html += '</tbody></table>';
             
-            html += `
-                    </tbody>
-                </table>
-            `;
-            
-            tableContainer.innerHTML = html;
+            console.log('HTML generado:', html.substring(0, 200));
+            container.innerHTML = html;
         }
 
+        // ========== CAMBIAR PESTAÑA ==========
         function cambiarTab(tab) {
             tabActual = tab;
-            
-            // Actualizar estilos de tabs
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            mostrarTabla();
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            const btns = document.querySelectorAll('.tab-btn');
+            if (tab === 'todas') btns[0].classList.add('active');
+            else if (tab === 'enviadas') btns[1].classList.add('active');
+            else if (tab === 'recibidas') btns[2].classList.add('active');
+            aplicarFiltros();
         }
 
         function limpiarFiltros() {
             document.getElementById('fechaInicio').value = '';
             document.getElementById('fechaFin').value = '';
-            document.getElementById('filtroBanco').value = '';
             document.getElementById('filtroMoneda').value = '';
-            cargarTransacciones();
+            document.getElementById('filtroEstado').value = '';
+            aplicarFiltros();
         }
-
-        async function cambiarEstado(transaccionId, confirmado) {
-            if (!confirmado) return;
-            
-            const confirmar = confirm('¿Confirmar que esta transacción ya aparece en tu estado de cuenta?');
-            if (!confirmar) {
-                const checkbox = document.querySelector(`.confirm-checkbox[data-id="${transaccionId}"]`);
-                if (checkbox) checkbox.checked = false;
+        // ========== EXPORTAR A EXCEL (CLIENTE) ==========
+        async function exportarExcel() {
+            if (!transaccionesFiltradas.length) {
+                mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
+                alert("Debes Filtrar Transaciones...")
                 return;
             }
-            
-            try {
-                const token = getToken();
-                const checkbox = document.querySelector(`.confirm-checkbox[data-id="${transaccionId}"]`);
-                if (checkbox) checkbox.disabled = true;
-                
-                // 👇 Usar el endpoint específico de confirmación
-                const response = await fetch(`${BASE_URL}/transacciones/${transaccionId}/confirmar`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    // Actualizar visualmente
-                    const estadoSpan = document.getElementById(`estado-${transaccionId}`);
-                    if (estadoSpan) {
-                        estadoSpan.textContent = 'CONFIRMADA';
-                        estadoSpan.className = 'badge badge-confirmada';
-                    }
-                    if (checkbox) {
-                        checkbox.checked = true;
-                        checkbox.disabled = true;
-                    }
-                    
-                    // Mostrar mensaje con la fecha
-                    const data = await response.json();
-                    const fechaConfirmacion = data.fecha_confirmacion ? new Date(data.fecha_confirmacion).toLocaleString() : '';
-                    mostrarMensajeTemporal(`✅ Transacción confirmada el ${fechaConfirmacion}`, 'success');
-                    
-                    setTimeout(() => cargarTransacciones(), 500);
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Error al confirmar');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensajeTemporal(`❌ Error: ${error.message}`, 'error');
-                const checkbox = document.querySelector(`.confirm-checkbox[data-id="${transaccionId}"]`);
-                if (checkbox) {
-                    checkbox.checked = false;
-                    checkbox.disabled = false;
-                }
-            }
+
+            // Preparar los datos para la hoja de cálculo
+            const datos = transaccionesFiltradas.map(t => ({
+                'Fecha': t.fecha || '',
+                'N° Transacción': t.numero_transaccion || '',
+                'Tipo': t.tipo === 'enviada' ? 'Enviada' : 'Recibida',
+                'Beneficiario': t.beneficiario || '',
+                'Ordenante': t.ordenante || '',
+                'Monto': (t.monto || 0).toFixed(2),
+                'Moneda': t.moneda || '',
+                'Estado': t.estado || '',
+                'Fecha Confirmación': t.fecha_confirmacion ? new Date(t.fecha_confirmacion).toLocaleString() : ''
+            }));
+
+            // Crear hoja de trabajo
+            const ws = XLSX.utils.json_to_sheet(datos);
+            // Ajustar anchos de columna (opcional)
+            const wscols = [
+                {wch:12}, {wch:18}, {wch:10}, {wch:25}, {wch:25}, {wch:12}, {wch:8}, {wch:12}, {wch:20}
+            ];
+            ws['!cols'] = wscols;
+
+            // Crear libro y descargar
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
+            XLSX.writeFile(wb, `transacciones_${new Date().toISOString().slice(0,19)}.xlsx`);
+            mostrarMensajeTemporal('✅ Excel exportado correctamente', 'success');
         }
 
+        // ========== EXPORTAR A PDF (CLIENTE) ==========
+        // ========== EXPORTAR A PDF (CLIENTE) CON RESUMEN DE MONTOS Y RANGO DE FECHAS ==========
+        async function exportarPDF() {
+            if (!transaccionesFiltradas.length) {
+                mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
+                return;
+            }
 
+            // Obtener el rango de fechas de los filtros actuales
+            let fechaInicioRaw = document.getElementById('fechaInicio')?.value || '';
+            let fechaFinRaw = document.getElementById('fechaFin')?.value || '';
+            // Formatear para mostrar en el título (DD/MM/YYYY) tal como se ingresó
+            const rangoTexto = (fechaInicioRaw && fechaFinRaw) 
+                ? `${fechaInicioRaw} - ${fechaFinRaw}`
+                : (fechaInicioRaw ? `Desde ${fechaInicioRaw}` : (fechaFinRaw ? `Hasta ${fechaFinRaw}` : 'Todos los períodos'));
+
+            // Calcular totales
+            const totalMonto = transaccionesFiltradas.reduce((sum, t) => sum + (t.monto || 0), 0);
+            const pendientesCount = transaccionesFiltradas.filter(t => t.estado === 'PENDIENTE').length;
+            const confirmadasCount = transaccionesFiltradas.filter(t => t.estado === 'CONFIRMADA').length;
+            const enviadasCount = transaccionesFiltradas.filter(t => t.tipo === 'enviada').length;
+            const recibidasCount = transaccionesFiltradas.filter(t => t.tipo === 'recibida').length;
+            
+            // Sumas de montos por estado
+            const montoPendientes = transaccionesFiltradas
+                .filter(t => t.estado === 'PENDIENTE')
+                .reduce((sum, t) => sum + (t.monto || 0), 0);
+            const montoConfirmadas = transaccionesFiltradas
+                .filter(t => t.estado === 'CONFIRMADA')
+                .reduce((sum, t) => sum + (t.monto || 0), 0);
+
+            // Crear elemento contenedor para el PDF
+            const printContent = document.createElement('div');
+            printContent.style.padding = '15px';
+            printContent.style.fontFamily = 'Arial, sans-serif';
+            printContent.style.fontSize = '12px';
+
+            // Título con rango de fechas
+            const title = document.createElement('h2');
+            title.textContent = `Reporte de Transacciones - ${rangoTexto}`;
+            title.style.textAlign = 'center';
+            title.style.color = '#1e3c72';
+            title.style.margin = '0 0 10px 0';
+            printContent.appendChild(title);
+
+            // Fecha de generación
+            const fechaGen = document.createElement('p');
+            fechaGen.textContent = `Generado el: ${new Date().toLocaleString()}`;
+            fechaGen.style.textAlign = 'center';
+            fechaGen.style.marginBottom = '15px';
+            printContent.appendChild(fechaGen);
+
+            // Resumen con totales y montos por estado
+            const resumenDiv = document.createElement('div');
+            resumenDiv.style.display = 'flex';
+            resumenDiv.style.flexWrap = 'wrap';
+            resumenDiv.style.justifyContent = 'space-between';
+            resumenDiv.style.backgroundColor = '#f0f0f0';
+            resumenDiv.style.padding = '10px';
+            resumenDiv.style.borderRadius = '8px';
+            resumenDiv.style.marginBottom = '20px';
+            resumenDiv.innerHTML = `
+                <div><strong>📊 Total transacciones:</strong> ${transaccionesFiltradas.length}</div>
+                <div><strong>💰 Monto total:</strong> ${totalMonto.toFixed(2)}</div>
+                <div><strong>⏳ Pendientes:</strong> ${pendientesCount} (Monto: ${montoPendientes.toFixed(2)})</div>
+                <div><strong>✅ Confirmadas:</strong> ${confirmadasCount} (Monto: ${montoConfirmadas.toFixed(2)})</div>
+                <div><strong>📤 Enviadas:</strong> ${enviadasCount}</div>
+                <div><strong>📥 Recibidas:</strong> ${recibidasCount}</div>
+            `;
+            printContent.appendChild(resumenDiv);
+
+            // Tabla de transacciones (igual que antes)
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+            table.style.border = '1px solid #ddd';
+            table.style.fontSize = '11px';
+
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = ['Fecha', 'N° Transacción', 'Tipo', 'Beneficiario', 'Ordenante', 'Monto', 'Moneda', 'Estado', 'Fecha Confirmación'];
+            headers.forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                th.style.border = '1px solid #ddd';
+                th.style.padding = '6px';
+                th.style.backgroundColor = '#f2f2f2';
+                th.style.textAlign = 'left';
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            for (const t of transaccionesFiltradas) {
+                const row = document.createElement('tr');
+                const cells = [
+                    t.fecha || '',
+                    t.numero_transaccion || '',
+                    t.tipo === 'enviada' ? 'Enviada' : 'Recibida',
+                    t.beneficiario || '',
+                    t.ordenante || '',
+                    (t.monto || 0).toFixed(2),
+                    t.moneda || '',
+                    t.estado || '',
+                    t.fecha_confirmacion ? new Date(t.fecha_confirmacion).toLocaleString() : ''
+                ];
+                cells.forEach(cellText => {
+                    const td = document.createElement('td');
+                    td.textContent = cellText;
+                    td.style.border = '1px solid #ddd';
+                    td.style.padding = '6px';
+                    row.appendChild(td);
+                });
+                tbody.appendChild(row);
+            }
+            table.appendChild(tbody);
+            printContent.appendChild(table);
+
+            // Pie de firma
+            const firmaDiv = document.createElement('div');
+            firmaDiv.style.marginTop = '30px';
+            firmaDiv.style.textAlign = 'right';
+            firmaDiv.style.fontStyle = 'italic';
+            firmaDiv.style.borderTop = '1px solid #ccc';
+            firmaDiv.style.paddingTop = '10px';
+            const usuarioNombre = user ? `${user.nombre} ${user.apellido}` : 'Usuario';
+            firmaDiv.innerHTML = `
+                <p>Firma: ___________________________</p>
+                <p>${usuarioNombre}</p>
+                <p>${new Date().toLocaleDateString()}</p>
+            `;
+            printContent.appendChild(firmaDiv);
+
+            // Opciones para html2pdf (horizontal landscape)
+            const opt = {
+                margin:        [0.5, 0.5, 0.5, 0.5],
+                filename:     `transacciones_${new Date().toISOString().slice(0,19)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, letterRendering: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+            };
+
+            html2pdf().set(opt).from(printContent).save();
+            mostrarMensajeTemporal('📄 PDF exportado correctamente', 'success');
+        }        
+        // ========== EXPORTACIONES ==========
+        async function resumenExportarExcel() {
+            token = getToken();
+            if (!token) return;
+            try {
+                mostrarMensajeTemporal('📊 Generando Excel...', 'success');
+                const response = await fetch(`${BASE_URL}/transacciones/exportar/excel`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'transacciones.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    mostrarMensajeTemporal('✅ Excel descargado', 'success');
+                } else throw new Error('Error exportar');
+            } catch (error) {
+                mostrarMensajeTemporal(`❌ ${error.message}`, 'error');
+            }
+        }
+        async function ResumenExportarPDF() {
+            token = getToken();
+            if (!token) return;
+            try {
+                mostrarMensajeTemporal('📄 Generando PDF...', 'success');
+                const response = await fetch(`${BASE_URL}/transacciones/exportar/pdf`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'transacciones.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    mostrarMensajeTemporal('✅ PDF descargado', 'success');
+                } else throw new Error('Error exportar');
+            } catch (error) {
+                mostrarMensajeTemporal(`❌ ${error.message}`, 'error');
+            }
+        }
         function mostrarMensajeTemporal(mensaje, tipo) {
-            // Crear elemento de mensaje flotante
             const msgDiv = document.createElement('div');
             msgDiv.textContent = mensaje;
-            msgDiv.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                padding: 12px 20px;
-                background: ${tipo === 'success' ? '#48bb78' : '#f56565'};
-                color: white;
-                border-radius: 8px;
-                font-weight: 600;
-                z-index: 1000;
-                animation: fadeInOut 3s ease-in-out;
-            `;
+            msgDiv.style.cssText = `position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; background: ${tipo === 'success' ? '#48bb78' : '#f56565'}; color: white; border-radius: 8px; font-weight: 600; z-index: 1000; animation: fadeInOut 3s ease-in-out;`;
             document.body.appendChild(msgDiv);
-            
-            // Eliminar después de 3 segundos
-            setTimeout(() => {
-                msgDiv.remove();
-            }, 3000);
+            setTimeout(() => msgDiv.remove(), 3000);
         }
-
-        // Agregar animación CSS (ponerlo en el style)
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fadeInOut {
-                0% { opacity: 0; transform: translateY(20px); }
-                15% { opacity: 1; transform: translateY(0); }
-                85% { opacity: 1; transform: translateY(0); }
-                100% { opacity: 0; transform: translateY(20px); }
-            }
-        `;
-        document.head.appendChild(style);
 
         // ========== INICIALIZACIÓN ==========
-        function initDatePickers() {
-            // Verificar que los elementos existen antes de inicializar
-            const fechaInicio = document.getElementById('fechaInicio');
-            const fechaFin = document.getElementById('fechaFin');
-            
-            if (!fechaInicio || !fechaFin) {
-                console.log('⚠️ Elementos de fecha no encontrados, omitiendo datepickers');
-                return;
-            }
-            
-            // Configuración del calendario
-            flatpickr("#fechaInicio", {
-                locale: "es",
-                dateFormat: "d/m/Y",
-                allowInput: true,
-                altInput: true,
-                altFormat: "d/m/Y"
-            });
-            
-            flatpickr("#fechaFin", {
-                locale: "es",
-                dateFormat: "d/m/Y",
-                allowInput: true,
-                altInput: true,
-                altFormat: "d/m/Y"
-            });
-        
-            
-            // Opcional: Establecer fechas por defecto (últimos 30 días)
-            // const hoy = new Date();
-            // const hace30Dias = new Date();
-            // hace30Dias.setDate(hoy.getDate() - 30);
-            //
-            // document.getElementById('fechaInicio').value = formatFecha(hace30Dias);
-            // document.getElementById('fechaFin').value = formatFecha(hoy);
-        }
-
-        function formatFecha(date) {
-            const dia = String(date.getDate()).padStart(2, '0');
-            const mes = String(date.getMonth() + 1).padStart(2, '0');
-            const año = date.getFullYear();
-            return `${dia}/${mes}/${año}`;
-        }
-
-
-
-
-
-
-
         async function init() {
-            
-            const token = getToken();
-            if (!token) {
-                window.location.href = '/test';
-                return;
-            }
-            
-            const user = await getUserProfile();
+            await getUserProfile();
             if (user) {
-                // Inicializar date pickers
                 initDatePickers();
-                
-                // Cargar transacciones
                 await aplicarFiltros();
             }
         }
-        // ========== FUNCIONES DE EXPORTAR DATOS  ==========
-        async function exportarExcel() {
-            const token = getToken();
-            if (!token) {
-                window.location.href = '/test';
-                return;
-            }
-            
-            try {
-                // Mostrar mensaje de carga
-                mostrarMensajeTemporal('📊 Generando archivo Excel...', 'info');
-                
-                const response = await fetch(`${BASE_URL}/transacciones/exportar/excel`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (response.ok) {
-                    // Obtener el nombre del archivo del header Content-Disposition
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = 'transacciones.xlsx';
-                    if (contentDisposition) {
-                        const match = contentDisposition.match(/filename=(.+)/);
-                        if (match) filename = match[1];
-                    }
-                    
-                    // Crear blob y descargar
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
-                    
-                    mostrarMensajeTemporal('✅ Excel descargado correctamente', 'success');
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Error al exportar');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensajeTemporal(`❌ Error: ${error.message}`, 'error');
-            }
+        if (!document.querySelector('#customFadeKeyframes')) {
+            const style = document.createElement('style');
+            style.id = 'customFadeKeyframes';
+            style.textContent = `@keyframes fadeInOut { 0% { opacity:0; transform:translateY(20px); } 15% { opacity:1; transform:translateY(0); } 85% { opacity:1; } 100% { opacity:0; transform:translateY(20px); } }`;
+            document.head.appendChild(style);
         }
-
-        async function exportarPDF() {
-            const token = getToken();
-            if (!token) {
-                window.location.href = '/test';
-                return;
-            }
-            
-            try {
-                mostrarMensajeTemporal('📄 Generando archivo PDF...', 'info');
-                
-                const response = await fetch(`${BASE_URL}/transacciones/exportar/pdf`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (response.ok) {
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = 'transacciones.pdf';
-                    if (contentDisposition) {
-                        const match = contentDisposition.match(/filename=(.+)/);
-                        if (match) filename = match[1];
-                    }
-                    
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
-                    
-                    mostrarMensajeTemporal('✅ PDF descargado correctamente', 'success');
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Error al exportar');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensajeTemporal(`❌ Error: ${error.message}`, 'error');
-            }
-        }
-
         init();
     </script>
 </body>

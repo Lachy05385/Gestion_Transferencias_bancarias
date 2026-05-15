@@ -397,7 +397,7 @@ def procesar_mensaje_plinea(mensaje):
     #fin = entidad_match.group(1).strip().find(')')
     #print("Entidad match - >",entidad_match)
     if entidad_match:
-        entidad = entidad_match.group(1).split()
+        entidad = entidad_match.group(1).strip().split()
         
         
         resultado["beneficiario"] = str(entidad)
@@ -414,9 +414,9 @@ def procesar_mensaje_plinea(mensaje):
         resultado["moneda"] = importe_match.group(2)
     
     # Extraer número de transacción
-    transaccion_match = re.search(r'Nro\.?\s*Transaccion:\s*([^\n\.]+)', mensaje, re.IGNORECASE)
+    transaccion_match = re.search(r'(?:Nro|No)\.?\s*Transaccion:\s*([^\n\.]+)', mensaje, re.IGNORECASE)
     if transaccion_match:
-        resultado["numero_transaccion"] = transaccion_match.group(1).strip()
+        resultado["numero_transaccion"] = transaccion_match.group(1).strip()[:13]
         
         
     print()
@@ -722,13 +722,14 @@ def extraer_fecha_ocr(texto: str) -> str:
 
 def extraer_datos_transferencia_de_texto_ocr(texto_ocr: str) -> dict:
     """
-    Versión especializada para extraer datos de texto OCR con errores
+    Versión especializada para extraer datos de texto OCR con errores.
+    Retorna siempre un diccionario con campos, usando valores por defecto.
     """
     resultado = {
-        "banco": "",
-        "fecha": "",
-        "beneficiario": "",
-        "ordenante": "",
+        "banco": "Banco cubano",          # 👈 valor por defecto
+        "fecha": "",                      # se pondrá la actual si no se encuentra
+        "beneficiario": "XXXX",
+        "ordenante": "XXXX",
         "telefono_ordenante": "",
         "monto": 0.0,
         "moneda": "CUP",
@@ -740,16 +741,32 @@ def extraer_datos_transferencia_de_texto_ocr(texto_ocr: str) -> dict:
     texto, texto_lower = limpiar_texto_ocr(texto_ocr)
     print(f"📝 Texto OCR limpiado: {texto}")
     
-    # 1. Extraer BANCO
-    bancos = ["banco popular", "bpopular", "popular", "banco metropolitano", "bpa"]
+    # 1. Extraer NÚMERO DE TRANSACCIÓN (prioritario)
+    nro = extraer_numero_transaccion_ocr(texto)
+    if nro and len(nro) >= 4:
+        resultado["numero_transaccion"] = nro
+        print(f"🔢 Número de transacción: {resultado['numero_transaccion']}")
+    
+    # 2. Extraer MONTO (prioritario)
+    monto = extraer_monto_ocr(texto, texto_lower)
+    if monto > 0:
+        resultado["monto"] = monto
+        print(f"💰 Monto: {resultado['monto']}")
+    
+    # 3. Extraer FECHA (si no, se usará la actual más adelante)
+    fecha = extraer_fecha_ocr(texto)
+    if fecha:
+        resultado["fecha"] = fecha
+        print(f"📅 Fecha: {resultado['fecha']}")
+    
+    # 4. Extraer BANCO (si no, ya tenemos "Banco cubano")
+    bancos = ["banco popular", "bpopular", "popular", "banco metropolitano", "bmetropolitano", "banco nacional"]
     for banco in bancos:
         if banco in texto_lower:
-            resultado["banco"] = "Banco Popular de Ahorro"
+            resultado["banco"] = "Banco Popular de Ahorro"  # o el que corresponda
             break
     
-    # 2. Extraer FECHA (con corrección OCR)
-    resultado["fecha"] = extraer_fecha_ocr(texto)
-
+  
     
     
     # 3. Extraer ORDENANTE (entidad que envía)
@@ -794,13 +811,12 @@ def extraer_datos_transferencia_de_texto_ocr(texto_ocr: str) -> dict:
     print("Numero de transaccion XX = ",resultado["numero_transaccion"])
     # Asignar valores por defecto si faltan
     if not resultado["beneficiario"]:
-        resultado["beneficiario"] = "XXXX"
+        resultado["beneficiario"] = "XXXX-xxxx-xxxx-XXXX"
     
     if not resultado["ordenante"]:
-        resultado["ordenante"] = "XXXX"
+        resultado["ordenante"] = "XXXX-xxxx-xxxx-XXXX"
     
-    if resultado["monto"] == 0:
-        resultado["monto"] = 240.00  # El monto que viste en la imagen
+   
     
     return resultado
 

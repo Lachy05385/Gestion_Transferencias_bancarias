@@ -47,6 +47,14 @@ app.add_middleware(
 # Endpoints públicos
 # main.py - Endpoints para 
 
+@app.get("/landing", response_class=HTMLResponse)
+async def landing_page(request: Request):
+    return templates.TemplateResponse("landing.html", {"request": request})
+
+
+
+
+
 #EMPRESAS
 @app.post("/empresas", response_model=schemas.EmpresaResponse)
 def crear_empresa(
@@ -221,6 +229,55 @@ def registrar_usuario(usuario: schemas.UserCreate, db: Session = Depends(get_db)
         )
     return crud.create_user(db=db, user=usuario)
 
+#=========  MODIFICAR USUARIOS ===================
+from fastapi import Body, HTTPException, Depends
+
+@app.patch("/usuarios/{usuario_id}", response_model=schemas.UserResponse)
+def actualizar_usuario(
+    usuario_id: int,
+    nombre: Optional[str] = Body(None),
+    apellido: Optional[str] = Body(None),
+    password_actual: Optional[str] = Body(None),
+    nueva_password: Optional[str] = Body(None),
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Actualizar nombre, apellido o contraseña de un usuario.
+    - El email NO se puede modificar.
+    - Si se envía nueva_password, se requiere password_actual (a menos que el usuario sea admin).
+    """
+    # Verificar que el usuario existe
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Permisos: solo el mismo usuario o un admin
+    if current_user.id != usuario_id and current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar este usuario")
+
+    # Actualizar nombre y apellido (si se proporcionan)
+    if nombre is not None:
+        usuario.nombre = nombre
+    if apellido is not None:
+        usuario.apellido = apellido
+
+    # Cambio de contraseña
+    if nueva_password is not None:
+        # Si no es admin, validar la contraseña actual
+        if current_user.rol != "admin":
+            if not password_actual:
+                raise HTTPException(status_code=400, detail="Se requiere la contraseña actual para cambiar la contraseña")
+            if not verify_password(password_actual, usuario.hashed_password):
+                raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+        # Hashear nueva contraseña
+        usuario.hashed_password = get_password_hash(nueva_password)
+
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
 # ========== ENDPOINTS PARA ADMIN (ELIMINAR Y EDITAR USUARIOS) ==========
 
 @app.delete("/admin/usuarios/{usuario_id}")
@@ -261,6 +318,8 @@ def editar_usuario(
     """
     Editar un usuario (solo administradores)
     """
+    
+    print("Modificacion de usuario  ",usuario_update)
     if current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
     
@@ -292,7 +351,38 @@ def editar_usuario(
     db.commit()
     db.refresh(usuario)
     
-    return usuario
+@app.patch("/admin/usuarios/{usuario_id}/desactivar")
+def desactivar_usuario(
+    usuario_id: int,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    if current_user.id == usuario_id:
+        raise HTTPException(status_code=400, detail="No puedes desactivarte a ti mismo")
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    usuario.esta_activo = False
+    db.commit()
+    return {"message": f"Usuario {usuario.email} desactivado", "usuario_id": usuario_id}
+
+# Reactivar usuario
+@app.patch("/admin/usuarios/{usuario_id}/reactivar")
+def reactivar_usuario(
+    usuario_id: int,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    usuario.esta_activo = True
+    db.commit()
+    return {"message": f"Usuario {usuario.email} reactivado", "usuario_id": usuario_id}
 
 #AUTENTICACION =================================
 @app.post("/token", response_model=schemas.Token)
@@ -612,7 +702,7 @@ async def recibir_transaccion(
         print(f"❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Mensaje Incorrecto: {str(e)}")
 
 
 
@@ -1003,132 +1093,130 @@ async def crear_transaccion_desde_imagen(
     """
     Crea una transacción a partir de una imagen (captura de pantalla)
     """
+    print("="*70)
+    print("📸 PROCESANDO IMAGEN DE TRANSFERENCIA")
+    print("="*70)
+
+    # 1. Autenticación
+    from app.auth import get_current_user_from_token
     try:
-        print("="*70)
-        print("📸 PROCESANDO IMAGEN DE TRANSFERENCIA")
-        print("="*70)
-        
-        # 1. Autenticar
-        from app.auth import get_current_user_from_token
         current_user = await get_current_user_from_token(token, db)
-        print(f"👤 Usuario: {current_user.email} (ID: {current_user.id}, empresa_id: {current_user.empresa_id})")
-        
-        # 2. Validar tipo de archivo
-        if not imagen.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="El archivo debe ser una imagen")
-        
-        # 3. Leer bytes de la imagen
+    except Exception as auth_error:
+        raise HTTPException(status_code=401, detail=f"No autorizado: {str(auth_error)}")
+    
+    print(f"👤 Usuario: {current_user.email} (ID: {current_user.id}, empresa_id: {current_user.empresa_id})")
+
+    # 2. Validar tipo de archivo
+    if not imagen.content_type or not imagen.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen (JPG, PNG, etc.)")
+
+    # 3. Leer imagen
+    try:
         imagen_bytes = await imagen.read()
+        if len(imagen_bytes) == 0:
+            raise HTTPException(status_code=400, detail="La imagen está vacía")
         print(f"📦 Tamaño de imagen: {len(imagen_bytes)} bytes")
-        
-        # 4. Extraer texto con OCR
-        try:
-            from app.utils import extraer_texto_de_imagen
-            texto_extraido = extraer_texto_de_imagen(imagen_bytes)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error en OCR: {str(e)}")
-        
-        if not texto_extraido or len(texto_extraido) < 10:
-            raise HTTPException(status_code=400, detail="No se pudo extraer texto suficiente")
-        
-        print(f"📝 Texto extraído:\n{texto_extraido}")
-        
-        # 5. Extraer datos de la transferencia
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al leer la imagen: {str(e)}")
+
+    # 4. OCR - Extraer texto
+    try:
+        from app.utils import extraer_texto_de_imagen
+        texto_extraido = extraer_texto_de_imagen(imagen_bytes)
+    except Exception as ocr_error:
+        print(f"❌ Error en OCR: {ocr_error}")
+        raise HTTPException(status_code=400, detail="No se pudo procesar la imagen con OCR. Asegúrate de que sea clara y tenga texto visible.")
+
+    if not texto_extraido or len(texto_extraido.strip()) < 10:
+        raise HTTPException(status_code=400, detail="No se pudo extraer texto suficiente de la imagen. Prueba con una captura más nítida.")
+
+    print(f"📝 Texto extraído:\n{texto_extraido}")
+
+    # 5. Extraer datos de transferencia del texto
+    try:
         from app.utils import extraer_datos_transferencia_de_texto_ocr
         datos = extraer_datos_transferencia_de_texto_ocr(texto_extraido)
-        
-        print(f"📊 Datos extraídos:")
-        for key, value in datos.items():
-            print(f"   {key}: {value}")
-        
-        # 6. Normalizar tipo
-        tipo_normalizado = tipo.lower().strip()
-        if tipo_normalizado not in ['enviada', 'recibida']:
-            raise HTTPException(status_code=400, detail="Tipo inválido")
-        
-        # 7. Obtener número de transacción
-        numero_transaccion = datos.get("numero_transaccion")
-        if not numero_transaccion or len(numero_transaccion) < 4:
-            from datetime import datetime
-            numero_transaccion = f"OCR{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    except Exception as extraction_error:
+        print(f"❌ Error al interpretar datos: {extraction_error}")
+        raise HTTPException(status_code=400, detail="No se pudieron interpretar los datos de la transferencia desde el texto extraído.")
+
+    # Validar que se haya extraído al menos algo útil
+    if not any([datos.get("monto"), datos.get("beneficiario"), datos.get("numero_transaccion")]):
+        raise HTTPException(status_code=400, detail="No se encontraron datos válidos de transferencia (monto, beneficiario o número de transacción).")
+
+    print("📊 Datos extraídos:")
+    for key, value in datos.items():
+        print(f"   {key}: {value}")
+
+    # 6. Normalizar tipo
+    tipo_normalizado = tipo.lower().strip()
+    if tipo_normalizado not in ['enviada', 'recibida']:
+        raise HTTPException(status_code=400, detail="El tipo debe ser 'enviada' o 'recibida'")
+
+    # 7. Generar/validar número de transacción
+    numero_transaccion = datos.get("numero_transaccion")
+    if not numero_transaccion or len(numero_transaccion) < 4:
+        from datetime import datetime
+        numero_transaccion = f"OCR{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        print(f"⚠️ Número de transacción no encontrado, se generó automático: {numero_transaccion}")
+    else:
+        # Limpiar caracteres no deseados
+        import re
         numero_transaccion = re.sub(r'[^\w\d-]', '', numero_transaccion).upper()
-        # ========== VERIFICAR DUPLICADOS ==========
-        print(f"🔍 Verificando si la transacción {numero_transaccion} ya existe...")
-        
-        transaccion_existente = db.query(models.Transaccion).filter(
-            models.Transaccion.numero_transaccion == numero_transaccion,
-            models.Transaccion.empresa_id == current_user.empresa_id
-        ).first()
-        
-        if transaccion_existente:
-            print(f"✅ Transacción ya existe (ID: {transaccion_existente.id})")
-            
-            # 👇 Aquí ya sabemos que transaccion_existente NO es None
-            # Normalizar campos si es necesario
-            if transaccion_existente.empresa_id is None:
-                transaccion_existente.empresa_id = current_user.empresa_id
-                db.commit()
-                print(f"   🔧 empresa_id corregido: {transaccion_existente.empresa_id}")
-            
-            # Normalizar otros campos
-            if not transaccion_existente.banco or len(transaccion_existente.banco) < 2:
-                transaccion_existente.banco = "Banco no especificado"
-            if not transaccion_existente.beneficiario or len(transaccion_existente.beneficiario) < 4:
-                transaccion_existente.beneficiario = "XXXX"
-            if not transaccion_existente.ordenante or len(transaccion_existente.ordenante) < 4:
-                transaccion_existente.ordenante = "XXXX"
-            if transaccion_existente.descripcion is None:
-                transaccion_existente.descripcion = ""
-            
-            return transaccion_existente
-        
-        print(f"✅ Transacción no existe, procediendo a crear...")
-        print("CREANDO TRANSACCION ",datos)
-        # 8. Crear nueva transacción
+
+    # 8. Verificar duplicados en la misma empresa
+    print(f"🔍 Verificando si la transacción {numero_transaccion} ya existe...")
+    transaccion_existente = db.query(models.Transaccion).filter(
+        models.Transaccion.numero_transaccion == numero_transaccion,
+        models.Transaccion.empresa_id == current_user.empresa_id
+    ).first()
+
+    if transaccion_existente:
+        print(f"✅ Transacción ya existe (ID: {transaccion_existente.id})")
+        # Normalizar campos mínimos si están vacíos (para evitar None)
+        if transaccion_existente.empresa_id is None:
+            transaccion_existente.empresa_id = current_user.empresa_id
+            db.commit()
+        if not transaccion_existente.banco:
+            transaccion_existente.banco = "Banco no especificado"
+        if not transaccion_existente.beneficiario:
+            transaccion_existente.beneficiario = "XXXX"
+        if not transaccion_existente.ordenante:
+            transaccion_existente.ordenante = "XXXX"
+        if transaccion_existente.descripcion is None:
+            transaccion_existente.descripcion = ""
+        db.commit()
+        return transaccion_existente
+
+    print("✅ Transacción no existe, procediendo a crear...")
+
+    # 9. Crear nueva transacción
+    try:
         nueva_transaccion = models.Transaccion(
             usuario_id=current_user.id,
             empresa_id=current_user.empresa_id,
-            banco=datos.get('banco', 'Banco no especificado'),
-            fecha= datos.get('fecha'),
-            beneficiario=datos.get('beneficiario', 'XXXX'),
-            ordenante=datos.get('ordenante', 'XXXX'),
-            monto=float(datos.get('monto', 0)),
+            banco=datos.get('banco') or "Banco no especificado",
+            fecha=datos.get('fecha'),
+            beneficiario=datos.get('beneficiario') or "XXXX-xxxx-xxxx-XXXX",
+            ordenante=datos.get('ordenante') or "XXXX-xxxx-xxxx-XXXX",
+            monto=float(datos.get('monto', 0.00)),
             moneda=datos.get('moneda', 'CUP'),
             numero_transaccion=numero_transaccion,
             tipo=tipo_normalizado,
             estado=models.EstadoTransaccion.PENDIENTE,
-            descripcion=descripcion or datos.get('concepto', f"OCR: {texto_extraido[:100]}"),
+            descripcion=descripcion or datos.get('concepto') or f"OCR: {texto_extraido[:100]}",
             etiquetas="[]"
         )
-        
         db.add(nueva_transaccion)
         db.commit()
         db.refresh(nueva_transaccion)
-        
-        print("✅ Transacción creada desde imagen")
-        print(f"🆔 ID: {nueva_transaccion.id}")
-        
+        print(f"✅ Transacción creada desde imagen. ID: {nueva_transaccion.id}")
         return nueva_transaccion
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error procesando imagen: {str(e)}")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error procesando imagen: {str(e)}"
-        )
 
+    except Exception as create_error:
+        db.rollback()
+        print(f"❌ Error al guardar en BD: {create_error}")
+        raise HTTPException(status_code=500, detail=f"Error al guardar la transacción: {str(create_error)}")
 
 # Reportes
 @app.get("/reportes/resumen", response_model=schemas.ResumenTransacciones)
@@ -1778,7 +1866,7 @@ def exportar_transacciones_pdf(
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
     """Panel de administración"""
-    return templates.TemplateResponse("admin.html", {"request": request})
+    return templates.TemplateResponse("admin1.html", {"request": request})
 
 # main.py - Endpoint para crear usuarios (solo admin)
 

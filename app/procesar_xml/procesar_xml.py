@@ -15,11 +15,12 @@ def leer_xml_simple(ruta_archivo):
     data = []
     with open(ruta_archivo, 'r', encoding='utf-8') as archivo:
         contenido = archivo.read()
-        print(type(contenido))
-        linea = contenido.split('\n')    
         
-        print(linea[0])
-        input("-------")
+        #print(type(contenido))
+        #linea = contenido.split('\n')    
+        
+        #print(linea[0])
+        #input("-------")
     # 2. Parsear el XML para ver su estructura jerárquica
     print("\n🌲 ESTRUCTURA DEL XML (etiquetas y atributos):")
     print("=" * 50)
