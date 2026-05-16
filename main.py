@@ -1,4 +1,14 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+#from app.routers.admin_usuarios import router
+from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload      # Para eager loading (cargar relaciones)
+from sqlalchemy.orm import selectinload    # Alternativa a joinedload (mejor para relaciones uno a muchos)
+from sqlalchemy.orm import subqueryload    # Otra alternativa
+from sqlalchemy.orm import lazyload        # Para carga perezosa (default)
+from sqlalchemy.orm import contains_eager
+import re
+
+
 
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -13,7 +23,7 @@ from datetime import timedelta
 from fastapi.responses import HTMLResponse
 from fastapi import APIRouter, Request
 from app.models import EstadoTransaccion
-
+from app.auth import get_password_hash
 
 
 # Crear tablas
@@ -35,6 +45,179 @@ app.add_middleware(
 )
 
 # Endpoints públicos
+# main.py - Endpoints para 
+
+@app.get("/landing", response_class=HTMLResponse)
+async def landing_page(request: Request):
+    return templates.TemplateResponse("landing.html", {"request": request})
+
+
+
+
+
+#EMPRESAS
+@app.post("/empresas", response_model=schemas.EmpresaResponse)
+def crear_empresa(
+    empresa: schemas.EmpresaCreate,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Crear una nueva empresa (solo admin)"""
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    
+    # Verificar si NIT ya existe
+    existente = db.query(models.Empresa).filter(models.Empresa.nit == empresa.nit).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="El NIT ya está registrado")
+    
+    nueva_empresa = models.Empresa(
+        nombre=empresa.nombre,
+        nit=empresa.nit,
+        direccion=empresa.direccion,
+        telefono=empresa.telefono
+    )
+    
+    db.add(nueva_empresa)
+    db.commit()
+    db.refresh(nueva_empresa)
+    return nueva_empresa
+
+@app.get("/empresas", response_model=List[schemas.EmpresaResponse])
+def listar_empresas(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Listar empresas (solo admin)"""
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    
+    empresas = db.query(models.Empresa).offset(skip).limit(limit).all()
+    return empresas
+
+# ========== ENDPOINT PARA CONTADOR (VER TRANSACCIONES DE LA EMPRESA) ==========
+
+@app.get("/transacciones/empresa", response_model=List[schemas.TransaccionResponse])
+def listar_transacciones_empresa(
+    usuario_id: Optional[int] = None,
+    estado: Optional[str] = None,
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
+    empresa_id: Optional[int] = None,  # 👈 AGREGAR ESTE PARÁMETRO
+    skip: int = 0,
+    limit: int = 100,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Listar transacciones de la empresa (solo para contadores y admins)
+    - Contador: ve todas las transacciones de su empresa (ignora empresa_id)
+    - Admin: puede ver transacciones de cualquier empresa (usando empresa_id)
+    """
+    # Verificar permisos
+    if current_user.rol not in ["contador", "admin"]:
+        raise HTTPException(
+            status_code=403, 
+            detail="No tienes permisos. Solo contadores y administradores pueden ver transacciones de la empresa"
+        )
+    
+    print(f"🔍 Usuario: {current_user.email} (rol: {current_user.rol}, empresa_id: {current_user.empresa_id})")
+    print(f"🔍 Parámetros - usuario_id: {usuario_id}, empresa_id: {empresa_id}")
+    
+    # Construir consulta
+    query = db.query(models.Transaccion).options(joinedload(models.Transaccion.usuario))
+    
+    # 👇 LÓGICA CORREGIDA
+    if current_user.rol == "contador":
+        # Contador: SOLO puede ver transacciones de su propia empresa
+        query = query.filter(models.Transaccion.empresa_id == current_user.empresa_id)
+        print(f"🏢 Contador filtrando por empresa_id: {current_user.empresa_id}")
+    elif current_user.rol == "admin":
+        # Admin: puede ver de cualquier empresa (si se especifica, sino todas)
+        if empresa_id is not None:
+            query = query.filter(models.Transaccion.empresa_id == empresa_id)
+            print(f"👑 Admin filtrando por empresa_id: {empresa_id}")
+        else:
+            print(f"👑 Admin viendo todas las empresas")
+    
+    # Filtro por usuario (opcional)
+    if usuario_id is not None:
+        query = query.filter(models.Transaccion.usuario_id == usuario_id)
+        print(f"👤 Filtrando por usuario_id: {usuario_id}")
+    
+    # Filtros adicionales
+    if estado:
+        query = query.filter(models.Transaccion.estado == estado)
+    if fecha_inicio:
+        query = query.filter(models.Transaccion.fecha >= fecha_inicio)
+    if fecha_fin:
+        query = query.filter(models.Transaccion.fecha <= fecha_fin)
+    
+    # Ordenar y ejecutar
+    transacciones = query.order_by(
+        models.Transaccion.fecha.desc()
+    ).offset(skip).limit(limit).all()
+    
+    print(f"📊 Transacciones encontradas: {len(transacciones)}")
+    
+    return transacciones
+
+
+# ========== ENDPOINT PARA OBTENER USUARIOS DE LA EMPRESA ==========
+
+@app.get("/empresa/usuarios", response_model=List[schemas.UserResponse])
+def listar_usuarios_empresa(
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Listar todos los usuarios de la empresa del contador
+    (Para que el contador pueda filtrar por usuario)
+    """
+    if current_user.rol not in ["contador", "admin"]:
+        raise HTTPException(
+            status_code=403, 
+            detail="No tienes permisos"
+        )
+    
+    usuarios = db.query(models.Usuario).filter(
+        models.Usuario.empresa_id == current_user.empresa_id
+    ).all()
+    
+    return usuarios
+
+#usuarios
+@app.get("/admin/usuarios", response_model=List[schemas.UserResponse])
+def listar_usuarios(
+    empresa_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Listar todos los usuarios (solo administradores)
+    Puede filtrar por empresa_id
+    """
+    # Verificar que quien consulta es admin
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    
+    # Construir consulta
+    query = db.query(models.Usuario)
+    
+    # Filtrar por empresa si se especifica
+    if empresa_id:
+        query = query.filter(models.Usuario.empresa_id == empresa_id)
+    
+    # Ordenar y paginar
+    usuarios = query.order_by(models.Usuario.id).offset(skip).limit(limit).all()
+    
+    return usuarios
+
+
 @app.post("/registro", response_model=schemas.UserResponse)
 def registrar_usuario(usuario: schemas.UserCreate, db: Session = Depends(get_db)):
     print("recibido", usuario)
@@ -46,6 +229,162 @@ def registrar_usuario(usuario: schemas.UserCreate, db: Session = Depends(get_db)
         )
     return crud.create_user(db=db, user=usuario)
 
+#=========  MODIFICAR USUARIOS ===================
+from fastapi import Body, HTTPException, Depends
+
+@app.patch("/usuarios/{usuario_id}", response_model=schemas.UserResponse)
+def actualizar_usuario(
+    usuario_id: int,
+    nombre: Optional[str] = Body(None),
+    apellido: Optional[str] = Body(None),
+    password_actual: Optional[str] = Body(None),
+    nueva_password: Optional[str] = Body(None),
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Actualizar nombre, apellido o contraseña de un usuario.
+    - El email NO se puede modificar.
+    - Si se envía nueva_password, se requiere password_actual (a menos que el usuario sea admin).
+    """
+    # Verificar que el usuario existe
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Permisos: solo el mismo usuario o un admin
+    if current_user.id != usuario_id and current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar este usuario")
+
+    # Actualizar nombre y apellido (si se proporcionan)
+    if nombre is not None:
+        usuario.nombre = nombre
+    if apellido is not None:
+        usuario.apellido = apellido
+
+    # Cambio de contraseña
+    if nueva_password is not None:
+        # Si no es admin, validar la contraseña actual
+        if current_user.rol != "admin":
+            if not password_actual:
+                raise HTTPException(status_code=400, detail="Se requiere la contraseña actual para cambiar la contraseña")
+            if not verify_password(password_actual, usuario.hashed_password):
+                raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+        # Hashear nueva contraseña
+        usuario.hashed_password = get_password_hash(nueva_password)
+
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
+# ========== ENDPOINTS PARA ADMIN (ELIMINAR Y EDITAR USUARIOS) ==========
+
+@app.delete("/admin/usuarios/{usuario_id}")
+def eliminar_usuario(
+    usuario_id: int,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Eliminar un usuario (solo administradores)
+    No se puede eliminar a sí mismo
+    """
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    
+    # No permitir eliminarse a sí mismo
+    if current_user.id == usuario_id:
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propio usuario")
+    
+    # Buscar usuario
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Eliminar usuario (las transacciones se eliminan en cascada si tienes cascade configurado)
+    db.delete(usuario)
+    db.commit()
+    
+    return {"message": f"Usuario {usuario.email} eliminado correctamente"}
+
+@app.put("/admin/usuarios/{usuario_id}", response_model=schemas.UserResponse)
+def editar_usuario(
+    usuario_id: int,
+    usuario_update: schemas.UserUpdate,  # Necesitas crear este schema
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Editar un usuario (solo administradores)
+    """
+    
+    print("Modificacion de usuario  ",usuario_update)
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    
+    # Buscar usuario
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Actualizar campos permitidos
+    if usuario_update.nombre is not None:
+        usuario.nombre = usuario_update.nombre
+    if usuario_update.apellido is not None:
+        usuario.apellido = usuario_update.apellido
+    if usuario_update.rol is not None:
+        usuario.rol = usuario_update.rol
+    if usuario_update.empresa_id is not None:
+        # Verificar que la empresa existe
+        empresa = db.query(models.Empresa).filter(models.Empresa.id == usuario_update.empresa_id).first()
+        if not empresa:
+            raise HTTPException(status_code=400, detail="La empresa no existe")
+        usuario.empresa_id = usuario_update.empresa_id
+    if usuario_update.esta_activo is not None:
+        usuario.esta_activo = usuario_update.esta_activo
+    
+    # Si se envía nueva contraseña, actualizarla
+    if usuario_update.password is not None and usuario_update.password.strip():
+        usuario.hashed_password = auth.get_password_hash(usuario_update.password)
+    
+    db.commit()
+    db.refresh(usuario)
+    
+@app.patch("/admin/usuarios/{usuario_id}/desactivar")
+def desactivar_usuario(
+    usuario_id: int,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    if current_user.id == usuario_id:
+        raise HTTPException(status_code=400, detail="No puedes desactivarte a ti mismo")
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    usuario.esta_activo = False
+    db.commit()
+    return {"message": f"Usuario {usuario.email} desactivado", "usuario_id": usuario_id}
+
+# Reactivar usuario
+@app.patch("/admin/usuarios/{usuario_id}/reactivar")
+def reactivar_usuario(
+    usuario_id: int,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    usuario.esta_activo = True
+    db.commit()
+    return {"message": f"Usuario {usuario.email} reactivado", "usuario_id": usuario_id}
+
+#AUTENTICACION =================================
 @app.post("/token", response_model=schemas.Token)
 async def login_for_access_token(
     # Esto acepta tanto JSON como form-data
@@ -103,51 +442,93 @@ async def login_for_access_token(
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
     }
 
+
+
 #patch
 # main.py - Agrega este endpoint ANTES de @app.get("/transacciones/{transaccion_id}")
 from app.schemas import EstadoUpdate
 @app.patch("/transacciones/{transaccion_id}", response_model=schemas.TransaccionResponse)
-def actualizar_estado_transaccion(
+def actualizar_transaccion(
     transaccion_id: int,
     transaccion_update: schemas.TransaccionUpdate,
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Actualizar el estado de una transacción.
-    Si se confirma (PENDIENTE -> CONFIRMADA), se registra la fecha de confirmación.
+    Actualizar una transacción (campos: tipo, estado, descripcion, monto, fecha, beneficiario, etc.)
+    - Usuario dueño: solo si está PENDIENTE
+    - Contador (misma empresa): puede editar PENDIENTE o CONFIRMADA
+    - Admin: puede editar cualquier transacción
     """
     print("="*60)
     print(f"📝 PATCH - Actualizando transacción ID: {transaccion_id}")
+    print(f"👤 Usuario: {current_user.email} (rol: {current_user.rol}, empresa_id: {current_user.empresa_id})")
     
-    # Buscar la transacción
+    # Buscar la transacción (primero por usuario actual)
     transaccion = db.query(models.Transaccion).filter(
         models.Transaccion.id == transaccion_id,
         models.Transaccion.usuario_id == current_user.id
     ).first()
     
+    # Si no es del usuario actual pero es admin o contador, buscar por empresa
+    if not transaccion and current_user.rol in ["admin", "contador"]:
+        transaccion = db.query(models.Transaccion).filter(
+            models.Transaccion.id == transaccion_id,
+            models.Transaccion.empresa_id == current_user.empresa_id
+        ).first()
+        if transaccion:
+            print(f"⚠️ {current_user.rol} editando transacción de otro usuario (ID propietario: {transaccion.usuario_id})")
+    
     if not transaccion:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     
-    print(f"Estado actual: {transaccion.estado}")
+    # Verificar permisos según estado
+    if transaccion.usuario_id == current_user.id:
+        # Dueño: solo puede editar si está PENDIENTE
+        if transaccion.estado == "CONFIRMADA" and current_user.rol != "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes editar una transacción confirmada. Contacta al contador o administrador."
+            )
+    elif current_user.rol not in ["admin", "contador"]:
+        # Ni dueño ni admin/contador
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permisos para editar esta transacción"
+        )
     
-    # Actualizar el estado
-    if transaccion_update.estado is not None:
-        estado_anterior = transaccion.estado
-        transaccion.estado = transaccion_update.estado
-        
-        # 👇 Si se confirma (cambia a CONFIRMADA), registrar la fecha
-        if transaccion_update.estado == EstadoTransaccion.CONFIRMADA and estado_anterior != EstadoTransaccion.CONFIRMADA:
-            transaccion.fecha_confirmacion = datetime.now()
-            print(f"✅ Transacción CONFIRMADA - Fecha: {transaccion.fecha_confirmacion}")
-        else:
-            print(f"Estado actualizado a: {transaccion.estado}")
+    # Obtener solo los campos enviados (excluir None)
+    update_data = transaccion_update.dict(exclude_unset=True)
+    print(f"📦 Datos recibidos para actualizar: {update_data}")
     
-    # Guardar cambios
+    # Lista de campos permitidos (evitar actualizar campos sensibles como id, usuario_id, empresa_id)
+    campos_permitidos = [
+        "tipo", "estado", "descripcion", "etiquetas",
+        "monto", "fecha", "banco", "beneficiario", "ordenante", "moneda"
+    ]
+    
+    # Actualizar campo por campo
+    for key, value in update_data.items():
+        if key in campos_permitidos and value is not None:
+            setattr(transaccion, key, value)
+            print(f"   ✅ '{key}' actualizado: {value}")
+        elif key not in campos_permitidos:
+            print(f"   ⚠️ Campo '{key}' no permitido, ignorado")
+    
+    # Si el estado cambió a CONFIRMADA, registrar fecha_confirmacion
+    if update_data.get('estado') == "CONFIRMADA" and transaccion.estado != "CONFIRMADA":
+        from datetime import datetime
+        transaccion.fecha_confirmacion = datetime.now()
+        print(f"   📅 Fecha confirmación registrada: {transaccion.fecha_confirmacion}")
+    
+    # Si el estado cambió a PENDIENTE, limpiar fecha_confirmacion
+    if update_data.get('estado') == "PENDIENTE" and transaccion.estado == "CONFIRMADA":
+        transaccion.fecha_confirmacion = None
+        print(f"   🗑️ Fecha confirmación eliminada")
+    
     db.commit()
     db.refresh(transaccion)
-    
-    print(f"Estado final: {transaccion.estado}")
+    print("✅ Cambios guardados correctamente")
     print("="*60)
     
     return transaccion
@@ -203,7 +584,7 @@ def procesar_texto_transaccion(texto: str,
 @app.post("/transacciones/recibir", response_model=schemas.TransaccionResponse)
 async def recibir_transaccion(
     texto: str = Form(...),
-    tipo: str = Form(...),  # Recibimos como string para poder normalizar
+    tipo: str = Form(...),
     token: str = Form(...),
     descripcion: Optional[str] = Form(None),
     db: Session = Depends(get_db)
@@ -219,129 +600,90 @@ async def recibir_transaccion(
         # 1. Autenticar
         from app.auth import get_current_user_from_token
         current_user = await get_current_user_from_token(token, db)
-        print(f"👤 Usuario: {current_user.email}")
+        print(f"👤 Usuario: {current_user.email} (Empresa ID: {current_user.empresa_id})")
         
-        # 2. NORMALIZAR TIPO - Convertir a minúsculas
+        # 2. NORMALIZAR TIPO
         tipo_normalizado = tipo.lower().strip()
-        print(f"🏷️ Tipo original: '{tipo}' -> Normalizado: '{tipo_normalizado}'")
-        
-        # Validar tipo
         if tipo_normalizado not in ['enviada', 'recibida']:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Tipo inválido. Debe ser 'enviada' o 'recibida', recibido: {tipo}"
-            )
+            raise HTTPException(status_code=400, detail=f"Tipo inválido")
         
         # 3. Normalizar texto
         from app.utils import normalizar_texto_transferencia, parse_transaccion_texto, normalizar_fecha
         texto_normalizado = normalizar_texto_transferencia(texto)
-        print(f"📥 Texto normalizado: {texto_normalizado}")
-        
-        # ordenar operaciones con diferentes tipos de texto
-       
         
         # 4. Parsear
         datos = parse_transaccion_texto(texto_normalizado)
-        # que pasa si los datos no son corrrectos o el mensaje no pude ser parseado 
+        
+        if datos == "Mensaje Incorrecto":
+            raise HTTPException(status_code=500, detail="El texto del mensaje no pudo ser procesado")
         
         print(f"📊 Datos parseados: {datos}")
         
         # 5. NORMALIZAR FECHA
         if datos.get('fecha'):
             datos['fecha'] = normalizar_fecha(datos['fecha'])
-            print(f"📅 Fecha normalizada: {datos['fecha']}")
         
         # 6. Verificar campos requeridos
         campos_requeridos = ['fecha', 'beneficiario', 'ordenante', 'monto', 'numero_transaccion']
         for campo in campos_requeridos:
             if not datos.get(campo):
-                # Intentar extraer del texto original como último recurso
                 if campo == 'beneficiario':
                     match = re.search(r'Beneficiario:\s*(\S+)', texto)
                     if match:
                         datos[campo] = match.group(1)
                         continue
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Campo requerido no encontrado: {campo}"
-                )
+                raise HTTPException(status_code=400, detail=f"Campo requerido no encontrado: {campo}")
         
-        # ========== NUEVA VALIDACIÓN: Verificar si la # It looks like the code snippet `transacc` is
-        # not a valid Python code. It seems to be a
-        # placeholder or a typo. If you provide more
-        # context or the actual code, I can help you
-        # understand what it is supposed to do.
-        #transacción YA EXISTE ==========
-        print(f"🔍 Verificando si la transacción {datos['numero_transaccion']} ya existe...")
+        # ========== VALIDACIÓN DE DUPLICADOS (CORREGIDA) ==========
+        numero_transaccion = datos['numero_transaccion']
+        print(f"🔍 Verificando si la transacción {numero_transaccion} ya existe...")
         
-        transaccion_existente = db.query(models.Transaccion).filter(
-            models.Transaccion.numero_transaccion == datos["numero_transaccion"],
+        # 1. Verificar si existe para el MISMO usuario
+        transaccion_mismo_usuario = db.query(models.Transaccion).filter(
+            models.Transaccion.numero_transaccion == numero_transaccion,
             models.Transaccion.usuario_id == current_user.id
         ).first()
         
-        if transaccion_existente:
-            print(f"✅ Transacción ya existe en BD (ID: {transaccion_existente.id})")
-            print(f"📅 Fecha en BD: {transaccion_existente.fecha}")
-            print(f"💰 Monto: {transaccion_existente.monto} {transaccion_existente.moneda}")
-            # En tu endpoint /transacciones/recibir, dentro del bloque donde encuentras la transacción existente
+        if transaccion_mismo_usuario:
+            print(f"⚠️ Transacción ya existe para este usuario (ID: {transaccion_mismo_usuario.id})")
+            #return transaccion_mismo_usuario 
 
-            if transaccion_existente:
-                print(f"✅ Transacción existente encontrada (ID: {transaccion_existente.id})")
-
-                # ===== NORMALIZAR CAMPOS PARA CUMPLIR VALIDACIONES =====
-                # Banco: si está vacío, poner un valor por defecto
-                if not transaccion_existente.banco or len(transaccion_existente.banco) < 2:
-                    transaccion_existente.banco = "Banco no especificado"
-                    print(f"   Banco normalizado: '{transaccion_existente.banco}'")
-
-                # Beneficiario: si es muy corto, completar con 'X' o valor por defecto
-                if not transaccion_existente.beneficiario or len(transaccion_existente.beneficiario) < 4:
-                    # Si es un teléfono (empieza con 'tel:'), ya tiene prefijo, lo dejamos
-                    if transaccion_existente.beneficiario and transaccion_existente.beneficiario.startswith("tel:"):
-                        # Asegurar que después de 'tel:' tenga al menos 1 dígito? La validación pide 4 caracteres totales.
-                        # 'tel:X' tiene 5 caracteres, cumple. Pero si es 'tel:' solo, no cumple.
-                        if len(transaccion_existente.beneficiario) < 4:
-                            transaccion_existente.beneficiario = "tel:0000" # Valor por defecto si está vacío
-                    else:
-                        # Si no es teléfono y es muy corto, poner marcador
-                        transaccion_existente.beneficiario = "X" * 4  # "XXXX" cumple min_length=4
-                    print(f"   Beneficiario normalizado: '{transaccion_existente.beneficiario}'")
-
-                # Ordenante: igual que beneficiario
-                if not transaccion_existente.ordenante or len(transaccion_existente.ordenante) < 4:
-                    if transaccion_existente.ordenante and transaccion_existente.ordenante.startswith("tel:"):
-                        if len(transaccion_existente.ordenante) < 4:
-                            transaccion_existente.ordenante = "tel:0000"
-                    else:
-                        transaccion_existente.ordenante = "X" * 4
-                    print(f"   Ordenante normalizado: '{transaccion_existente.ordenante}'")
-                # ===== FIN DE NORMALIZACIÓN =====
-
-                # También podrías necesitar normalizar la fecha aquí si es necesario
-                from app.utils import normalizar_fecha
-                if transaccion_existente.fecha:
-                    try:
-                        transaccion_existente.fecha = normalizar_fecha(transaccion_existente.fecha)
-                    except:
-                        transaccion_existente.fecha = datetime.now().strftime("%d/%m/%Y")
-
-                return transaccion_existente
-                        # Devolver la transacción existente en lugar de crear una nueva
-
+            raise HTTPException(
+                status_code=409,
+                detail=f"La transacción {numero_transaccion} ya está registrada para este usuario"
+            )
+        
+        # 2. Verificar si existe para OTRO usuario de la misma empresa
+        transaccion_otro_usuario = db.query(models.Transaccion).filter(
+            models.Transaccion.numero_transaccion == numero_transaccion,
+            models.Transaccion.empresa_id == current_user.empresa_id,
+            models.Transaccion.usuario_id != current_user.id
+        ).first()
+        
+        if transaccion_otro_usuario:
+            print(f"⚠️ Transacción ya existe para otro usuario (ID: {transaccion_otro_usuario.id})")
+            
+            raise HTTPException(
+                status_code=409,
+                detail=f"La transacción {numero_transaccion} ya fue registrada por otro usuario"
+            )
+            
+        
         print(f"✅ Transacción no existe, procediendo a crear...")
-        # ========== FIN DE LA NUEVA VALIDACIÓN ==========
-
+        # ========== FIN VALIDACIÓN ==========
+        
         # 7. Crear transacción
         nueva_transaccion = models.Transaccion(
             usuario_id=current_user.id,
+            empresa_id=current_user.empresa_id,
             banco=datos.get('banco', 'Banco Popular'),
             fecha=datos['fecha'],
             beneficiario=datos['beneficiario'],
             ordenante=datos['ordenante'],
             monto=float(datos['monto']),
             moneda=datos.get('moneda', 'CUP'),
-            numero_transaccion=datos['numero_transaccion'],
-            tipo=tipo_normalizado,  # Usamos el tipo normalizado
+            numero_transaccion=numero_transaccion,
+            tipo=tipo_normalizado,
             estado=models.EstadoTransaccion.PENDIENTE,
             descripcion=descripcion or datos.get('concepto', ''),
             etiquetas="[]"
@@ -352,10 +694,6 @@ async def recibir_transaccion(
         db.refresh(nueva_transaccion)
         
         print("✅ Transacción guardada")
-        print(f"🆔 ID: {nueva_transaccion.id}")
-        print(f"📅 Fecha: {nueva_transaccion.fecha}")
-        print(f"🏷️ Tipo: {nueva_transaccion.tipo}")
-        
         return nueva_transaccion
         
     except HTTPException:
@@ -364,10 +702,7 @@ async def recibir_transaccion(
         print(f"❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error interno: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Mensaje Incorrecto: {str(e)}")
 
 
 
@@ -492,38 +827,26 @@ def crear_transaccion(
     print("tipo de dato ",type(transaccion))
     return crud.create_transaccion(db=db, transaccion=transaccion, usuario_id=current_user.id)
 
-@app.get("/transacciones/", response_model=List[schemas.TransaccionResponse])
+def get_transacciones_empresa(db: Session, empresa_id: int, **filtros):
+    """Obtener transacciones de una empresa"""
+    query = db.query(models.Transaccion).filter(
+        models.Transaccion.empresa_id == empresa_id
+    )
+    # ... aplicar filtros ...
+    return query.all()
+
+
+
+
+
+
+@app.get("/transacciones/")
 def listar_transacciones(
-    skip: int = 0,
-    limit: int = 100,
-    tipo: Optional[str] = None,  # Recibir como str
-    estado: Optional[str] = None,  # Recibir como str
-    banco: Optional[str] = None,
-    fecha_inicio: Optional[str] = None,
-    fecha_fin: Optional[str] = None,
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Listar transacciones del usuario con filtros"""
-    
-    # Convertir a mayúsculas para coincidir con la BD
-    tipo_value = tipo.upper() if tipo else None
-    estado_value = estado.upper() if estado else None
-    
-    transacciones = crud.get_transacciones_usuario(
-        db=db,
-        usuario_id=current_user.id,
-        skip=skip,
-        limit=limit,
-        tipo=tipo_value,
-        estado=estado_value,
-        banco=banco,
-        fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin
-    )
-    
-    transacciones.sort(key=lambda x: x.fecha, reverse=True)
-    
+    # Usuario ve transacciones de su empresa
+    transacciones = get_transacciones_empresa(db, current_user.empresa_id)
     return transacciones
 
 
@@ -532,19 +855,75 @@ def listar_transacciones(
 
 @app.get("/transacciones/buscar", response_model=List[schemas.TransaccionResponse])
 def buscar_transacciones(
-    q: str = Query(..., min_length=2, max_length=100, description="Término de búsqueda"),
+    q: str = Query(..., min_length=1, description="Término de búsqueda"),
+    tipo: Optional[str] = Query(None, description="Filtrar por tipo: enviada o recibida"),
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Buscar transacciones por texto en beneficiario, ordenante, descripción, etc."""
+    """
+    Buscar transacciones del usuario actual.
+    IMPORTANTE: Solo se pueden buscar transacciones propias.
+    """
+    print(f"🔍 Búsqueda: '{q}', tipo: '{tipo}'")
+    print(f"👤 Usuario: {current_user.email} (ID: {current_user.id}, rol: {current_user.rol})")
     
+    # Verificar si el usuario tiene transacciones en general
+    total_transacciones = db.query(models.Transaccion).filter(
+        models.Transaccion.usuario_id == current_user.id
+    ).count()
     
-    try:
-        resultados = crud.buscar_transacciones(db, current_user.id, q)
-        return resultados
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en la búsqueda: {str(e)}")
-
+    print(f"📊 Total de transacciones del usuario: {total_transacciones}")
+    
+    if total_transacciones == 0:
+        print(f"⚠️ El usuario {current_user.email} no tiene transacciones registradas")
+        # Devolver lista vacía con información en el header (opcional)
+        # O simplemente devolver lista vacía
+        return []
+    
+    # Construir consulta base: SOLO transacciones del usuario actual
+    query = db.query(models.Transaccion).filter(
+        models.Transaccion.usuario_id == current_user.id
+    )
+    
+    # Aplicar filtro de tipo si existe
+    if tipo:
+        tipo_normalizado = tipo.lower().strip()
+        if tipo_normalizado in ['enviada', 'recibida']:
+            query = query.filter(models.Transaccion.tipo == tipo_normalizado)
+            print(f"   Filtro por tipo: {tipo_normalizado}")
+    
+    # Aplicar búsqueda por texto en varios campos
+    search_pattern = f"%{q}%"
+    query = query.filter(
+        (models.Transaccion.numero_transaccion.ilike(search_pattern)) |
+        (models.Transaccion.beneficiario.ilike(search_pattern)) |
+        (models.Transaccion.ordenante.ilike(search_pattern)) |
+        (models.Transaccion.banco.ilike(search_pattern)) |
+        (models.Transaccion.descripcion.ilike(search_pattern))
+    )
+    
+    # Ordenar y limitar
+    transacciones = query.order_by(
+        models.Transaccion.fecha.desc()
+    ).limit(50).all()
+    
+    print(f"📊 Transacciones encontradas con el filtro: {len(transacciones)}")
+    
+    if len(transacciones) == 0 and total_transacciones > 0:
+        print(f"⚠️ No se encontraron coincidencias para '{q}' en las transacciones del usuario")
+    
+    # Normalizar datos para evitar errores de validación
+    for t in transacciones:
+        if not t.banco or len(t.banco) < 2:
+            t.banco = "Banco no especificado"
+        if not t.beneficiario or len(t.beneficiario) < 4:
+            t.beneficiario = "XXXX"
+        if not t.ordenante or len(t.ordenante) < 4:
+            t.ordenante = "XXXX"
+        if t.descripcion is None:
+            t.descripcion = ""
+    
+    return transacciones
 
 
 
@@ -564,6 +943,53 @@ def obtener_transaccion(
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     return transaccion
 
+
+# main.py - Agregar este endpoint
+@app.get("/eliminar-transaccion", response_class=HTMLResponse)
+async def eliminar_transaccion_page(request: Request):
+    """Página para eliminar transacciones"""
+    return templates.TemplateResponse("eliminar_transaccion.html", {"request": request})
+@app.delete("/transacciones/{transaccion_id}")
+def eliminar_transaccion(
+    transaccion_id: int,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Eliminar una transacción (solo el usuario propietario o admin puede hacerlo)
+    """
+    print("="*60)
+    print(f"🗑️ Eliminando transacción ID: {transaccion_id}")
+    print(f"👤 Usuario: {current_user.email} (rol: {current_user.rol})")
+    
+    # Buscar la transacción
+    transaccion = db.query(models.Transaccion).filter(
+        models.Transaccion.id == transaccion_id,
+        models.Transaccion.usuario_id == current_user.id
+    ).first()
+    
+    # Si es admin, puede eliminar cualquier transacción
+    if not transaccion and current_user.rol == "admin":
+        transaccion = db.query(models.Transaccion).filter(
+            models.Transaccion.id == transaccion_id
+        ).first()
+        if transaccion:
+            print(f"⚠️ Admin eliminando transacción de otro usuario (ID: {transaccion.usuario_id})")
+    
+    if not transaccion:
+        raise HTTPException(status_code=404, detail="Transacción no encontrada")
+    
+    # Guardar información para log
+    info = f"{transaccion.fecha} - {transaccion.numero_transaccion} - {transaccion.monto} {transaccion.moneda}"
+    
+    # Eliminar
+    db.delete(transaccion)
+    db.commit()
+    
+    print(f"✅ Transacción eliminada: {info}")
+    print("="*60)
+    
+    return {"message": "Transacción eliminada correctamente", "id": transaccion_id, "info": info}
 
 
 @app.put("/transacciones/{transaccion_id}", response_model=schemas.TransaccionResponse)
@@ -658,128 +1084,139 @@ from fastapi import File, UploadFile
 import io
 @app.post("/transacciones/from-image", response_model=schemas.TransaccionResponse)
 async def crear_transaccion_desde_imagen(
-    imagen: UploadFile = File(..., description="Captura de pantalla de la transferencia"),
-    tipo: str = Form(..., description="Tipo de transacción: enviada o recibida"),
-    descripcion: Optional[str] = Form(None, description="Descripción opcional"),
-    token: str = Form(..., description="Token JWT"),
+    imagen: UploadFile = File(...),
+    tipo: str = Form(...),
+    descripcion: Optional[str] = Form(None),
+    token: str = Form(...),
     db: Session = Depends(get_db)
 ):
     """
     Crea una transacción a partir de una imagen (captura de pantalla)
-    Usa OCR para extraer el texto y parsear los datos
     """
+    print("="*70)
+    print("📸 PROCESANDO IMAGEN DE TRANSFERENCIA")
+    print("="*70)
+
+    # 1. Autenticación
+    from app.auth import get_current_user_from_token
     try:
-        print("="*70)
-        print("📸 PROCESANDO IMAGEN DE TRANSFERENCIA")
-        print("="*70)
-        
-        # 1. Autenticar
-        from app.auth import get_current_user_from_token
         current_user = await get_current_user_from_token(token, db)
-        print(f"👤 Usuario: {current_user.email}")
-        
-        # 2. Validar tipo de archivo
-        if not imagen.content_type.startswith('image/'):
-            raise HTTPException(
-                status_code=400,
-                detail="El archivo debe ser una imagen (JPEG, PNG, etc.)"
-            )
-        
-        # 3. Leer bytes de la imagen
+    except Exception as auth_error:
+        raise HTTPException(status_code=401, detail=f"No autorizado: {str(auth_error)}")
+    
+    print(f"👤 Usuario: {current_user.email} (ID: {current_user.id}, empresa_id: {current_user.empresa_id})")
+
+    # 2. Validar tipo de archivo
+    if not imagen.content_type or not imagen.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen (JPG, PNG, etc.)")
+
+    # 3. Leer imagen
+    try:
         imagen_bytes = await imagen.read()
+        if len(imagen_bytes) == 0:
+            raise HTTPException(status_code=400, detail="La imagen está vacía")
         print(f"📦 Tamaño de imagen: {len(imagen_bytes)} bytes")
-        
-        # 4. Extraer texto con OCR
-        try:
-            from app.utils import extraer_texto_de_imagen
-            texto_extraido = extraer_texto_de_imagen(imagen_bytes)
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"No se pudo extraer texto de la imagen: {str(e)}"
-            )
-       
-        
-        if not texto_extraido or len(texto_extraido) < 10:
-            raise HTTPException(
-                status_code=400,
-                detail="No se pudo extraer texto suficiente de la imagen. ¿La imagen es legible?"
-            )
-            
-        
-        print(f"📝 Texto extraído:\n{texto_extraido}")
-       
-       
-        # 5. Extraer datos de la transferencia
-        from app.utils import extraer_datos_transferencia_de_texto_ocr, normalizar_fecha
-        from app.utils import validar_y_normalizar_datos_transferencia
-        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al leer la imagen: {str(e)}")
+
+    # 4. OCR - Extraer texto
+    try:
+        from app.utils import extraer_texto_de_imagen
+        texto_extraido = extraer_texto_de_imagen(imagen_bytes)
+    except Exception as ocr_error:
+        print(f"❌ Error en OCR: {ocr_error}")
+        raise HTTPException(status_code=400, detail="No se pudo procesar la imagen con OCR. Asegúrate de que sea clara y tenga texto visible.")
+
+    if not texto_extraido or len(texto_extraido.strip()) < 10:
+        raise HTTPException(status_code=400, detail="No se pudo extraer texto suficiente de la imagen. Prueba con una captura más nítida.")
+
+    print(f"📝 Texto extraído:\n{texto_extraido}")
+
+    # 5. Extraer datos de transferencia del texto
+    try:
+        from app.utils import extraer_datos_transferencia_de_texto_ocr
         datos = extraer_datos_transferencia_de_texto_ocr(texto_extraido)
-        print("ANtes de Validar \n",datos)
-        
-        datos = validar_y_normalizar_datos_transferencia(datos)
-        print("Validados  \n",datos)
-        print(f"📊 Datos extraídos:")
-        for key, value in datos.items():
-            print(f"   {key}: {value}")
-        
-        # 6. Validar campos requeridos
-        campos_requeridos = ['fecha', 'beneficiario', 'ordenante', 'monto', 'numero_transaccion']
-        for campo in campos_requeridos:
-            if not datos.get(campo) or datos[campo] in ["XXXX", ""]:
-                print(f"⚠️ Campo {campo} no encontrado, usando valor por defecto")
-        
-        # 7. Normalizar tipo
-        tipo_normalizado = tipo.lower().strip()
-        if tipo_normalizado not in ['enviada', 'recibida']:
-            raise HTTPException(status_code=400, detail="Tipo inválido")
-        
-        # 8. Verificar duplicados
-        transaccion_existente = db.query(models.Transaccion).filter(
-            models.Transaccion.numero_transaccion == datos["numero_transaccion"],
-            models.Transaccion.usuario_id == current_user.id
-        ).first()
-        
-        if transaccion_existente:
-            print(f"✅ Transacción ya existe (ID: {transaccion_existente.id})")
-            return transaccion_existente
-        
-        # 9. Crear transacción
+    except Exception as extraction_error:
+        print(f"❌ Error al interpretar datos: {extraction_error}")
+        raise HTTPException(status_code=400, detail="No se pudieron interpretar los datos de la transferencia desde el texto extraído.")
+
+    # Validar que se haya extraído al menos algo útil
+    if not any([datos.get("monto"), datos.get("beneficiario"), datos.get("numero_transaccion")]):
+        raise HTTPException(status_code=400, detail="No se encontraron datos válidos de transferencia (monto, beneficiario o número de transacción).")
+
+    print("📊 Datos extraídos:")
+    for key, value in datos.items():
+        print(f"   {key}: {value}")
+
+    # 6. Normalizar tipo
+    tipo_normalizado = tipo.lower().strip()
+    if tipo_normalizado not in ['enviada', 'recibida']:
+        raise HTTPException(status_code=400, detail="El tipo debe ser 'enviada' o 'recibida'")
+
+    # 7. Generar/validar número de transacción
+    numero_transaccion = datos.get("numero_transaccion")
+    if not numero_transaccion or len(numero_transaccion) < 4:
+        from datetime import datetime
+        numero_transaccion = f"OCR{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        print(f"⚠️ Número de transacción no encontrado, se generó automático: {numero_transaccion}")
+    else:
+        # Limpiar caracteres no deseados
+        import re
+        numero_transaccion = re.sub(r'[^\w\d-]', '', numero_transaccion).upper()
+
+    # 8. Verificar duplicados en la misma empresa
+    print(f"🔍 Verificando si la transacción {numero_transaccion} ya existe...")
+    transaccion_existente = db.query(models.Transaccion).filter(
+        models.Transaccion.numero_transaccion == numero_transaccion,
+        models.Transaccion.empresa_id == current_user.empresa_id
+    ).first()
+
+    if transaccion_existente:
+        print(f"✅ Transacción ya existe (ID: {transaccion_existente.id})")
+        # Normalizar campos mínimos si están vacíos (para evitar None)
+        if transaccion_existente.empresa_id is None:
+            transaccion_existente.empresa_id = current_user.empresa_id
+            db.commit()
+        if not transaccion_existente.banco:
+            transaccion_existente.banco = "Banco no especificado"
+        if not transaccion_existente.beneficiario:
+            transaccion_existente.beneficiario = "XXXX"
+        if not transaccion_existente.ordenante:
+            transaccion_existente.ordenante = "XXXX"
+        if transaccion_existente.descripcion is None:
+            transaccion_existente.descripcion = ""
+        db.commit()
+        return transaccion_existente
+
+    print("✅ Transacción no existe, procediendo a crear...")
+
+    # 9. Crear nueva transacción
+    try:
         nueva_transaccion = models.Transaccion(
             usuario_id=current_user.id,
-            banco=datos.get('banco', 'Banco no especificado'),
-            fecha=datos['fecha'],
-            beneficiario=datos['beneficiario'],
-            ordenante=datos['ordenante'],
-            monto=float(datos['monto']),
+            empresa_id=current_user.empresa_id,
+            banco=datos.get('banco') or "Banco no especificado",
+            fecha=datos.get('fecha'),
+            beneficiario=datos.get('beneficiario') or "XXXX-xxxx-xxxx-XXXX",
+            ordenante=datos.get('ordenante') or "XXXX-xxxx-xxxx-XXXX",
+            monto=float(datos.get('monto', 0.00)),
             moneda=datos.get('moneda', 'CUP'),
-            numero_transaccion=datos['numero_transaccion'],
+            numero_transaccion=numero_transaccion,
             tipo=tipo_normalizado,
             estado=models.EstadoTransaccion.PENDIENTE,
-            descripcion=descripcion or datos.get('concepto', f"OCR: {texto_extraido[:100]}"),
+            descripcion=descripcion or datos.get('concepto') or f"OCR: {texto_extraido[:100]}",
             etiquetas="[]"
         )
-                
         db.add(nueva_transaccion)
         db.commit()
         db.refresh(nueva_transaccion)
-        
-        print("✅ Transacción creada desde imagen")
-        print(f"🆔 ID: {nueva_transaccion.id}")
-        
+        print(f"✅ Transacción creada desde imagen. ID: {nueva_transaccion.id}")
         return nueva_transaccion
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error procesando imagen: {str(e)}"
-        )
 
+    except Exception as create_error:
+        db.rollback()
+        print(f"❌ Error al guardar en BD: {create_error}")
+        raise HTTPException(status_code=500, detail=f"Error al guardar la transacción: {str(create_error)}")
 
 # Reportes
 @app.get("/reportes/resumen", response_model=schemas.ResumenTransacciones)
@@ -970,7 +1407,13 @@ async def test_page(request: Request):
     """
     Página de prueba para el endpoint de transferencias
     """
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("login_simple.html", {"request": request})
+
+@app.get("/capturar", response_class=HTMLResponse)
+async def capturar_page(request: Request):
+    """Página para capturar transferencias (principal para usuarios)"""
+    return templates.TemplateResponse("capturar.html", {"request": request})
+
 
 @app.get("/transacciones/enviadas/por-fecha", response_model=List[schemas.TransaccionResponse])
 async def listar_transacciones_enviadas_por_fecha(
@@ -1116,6 +1559,17 @@ async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
+@app.get("/dashboard_unificado", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    """
+    Panel de usuario para consultar transacciones
+    """
+    return templates.TemplateResponse("dashboard_unificado.html", {"request": request})
+
+
+
+
+
 #EDITAR TRANSACCIONES 
 # main.py - Agregar después de tus endpoints existentes
 
@@ -1144,7 +1598,8 @@ def buscar_transacciones_para_editar(
             (models.Transaccion.numero_transaccion.ilike(f"%{q}%")) |
             (models.Transaccion.beneficiario.ilike(f"%{q}%")) |
             (models.Transaccion.ordenante.ilike(f"%{q}%")) |
-            (models.Transaccion.banco.ilike(f"%{q}%"))
+            (models.Transaccion.banco.ilike(f"%{q}%")) |
+            (models.Transaccion.monto.ilike(f"%{q}%"))
         )
     
     # Aplicar filtro de tipo si existe
@@ -1166,9 +1621,9 @@ def buscar_transacciones_para_editar(
         if not t.ordenante or len(t.ordenante) < 4:
             t.ordenante = "XXXX"
     
+    
     return transacciones
-# main.py - Verifica que tienes este endpoint (ya lo tenías)
-# Si no lo tienes, agrégalo:
+
 
 
 
@@ -1407,6 +1862,132 @@ def exportar_transacciones_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+#pagina principal
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request):
+    """Panel de administración"""
+    return templates.TemplateResponse("admin1.html", {"request": request})
+
+# main.py - Endpoint para crear usuarios (solo admin)
+
+@app.post("/admin/usuarios", response_model=schemas.UserResponse)
+def crear_usuario_por_admin(
+    usuario: schemas.UserCreate,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Crear nuevo usuario (solo administradores)"""
+    print("usuario recibido: ",usuario)
+    # Verificar que quien crea es admin
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    
+    # Verificar si el email ya existe
+    db_user = crud.get_user_by_email(db, email=usuario.email)
+    
+    if db_user:
+        raise HTTPException(status_code=400, detail="El email ya está registrado")
+    
+    # Validar que el rol sea válido
+    rol_valido = usuario.rol if hasattr(usuario, 'rol') and usuario.rol in ["usuario", "contador", "admin"] else "usuario"
+    if len(usuario.password) < 5:
+        return "Pasword too Short "
+    # Crear usuario con el rol seleccionado
+    nuevo_usuario = models.Usuario(
+        email=usuario.email,
+        nombre=usuario.nombre,
+        apellido=usuario.apellido,
+        hashed_password=get_password_hash(usuario.password),
+        esta_activo=True,
+        rol=rol_valido,
+        empresa_id=usuario.empresa_id
+        )
+    
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+    
+    return nuevo_usuario
+
+@app.get("/admin/usuarios", response_model=List[schemas.UserResponse])
+def listar_usuarios(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Listar todos los usuarios (solo administradores)"""
+    
+    print(f"🔍 Usuario actual: {current_user.email}, rol: {current_user.rol}")
+    
+    if current_user.rol != "admin":
+        print(f"❌ Acceso denegado: {current_user.rol} no es admin")
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    
+    usuarios = db.query(models.Usuario).offset(skip).limit(limit).all()
+    print(f"📊 Usuarios encontrados: {len(usuarios)}")
+    
+    return usuarios
+
+# ========== ENDPOINTS PARA OPINIONES ==========
+
+@app.post("/opiniones")
+def crear_opinion(
+    opinion: schemas.OpinionCreate,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Crear una nueva opinión o sugerencia"""
+    nueva_opinion = models.Opinion(
+        usuario_id=current_user.id,
+        usuario_nombre=f"{current_user.nombre} {current_user.apellido}",
+        titulo=opinion.titulo,
+        mensaje=opinion.mensaje,
+        puntuacion=opinion.puntuacion
+    )
+    db.add(nueva_opinion)
+    db.commit()
+    db.refresh(nueva_opinion)
+    return {"message": "Opinión enviada correctamente", "id": nueva_opinion.id}
+
+@app.get("/opiniones")
+def listar_opiniones(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """Listar opiniones (público, solo lectura)"""
+    opiniones = db.query(models.Opinion).order_by(
+        models.Opinion.fecha.desc()
+    ).offset(skip).limit(limit).all()
+    return opiniones
+
+
+
+@app.get("/admin/usuarios/{usuario_id}/transacciones", response_model=List[schemas.TransaccionResponse])
+def ver_transacciones_usuario(
+    usuario_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Ver transacciones de un usuario específico (solo administradores)"""
+    
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+    
+    transacciones = db.query(models.Transaccion).filter(
+        models.Transaccion.usuario_id == usuario_id
+    ).order_by(models.Transaccion.fecha.desc()).offset(skip).limit(limit).all()
+    
+    return transacciones
+
+@app.get("/clientes", response_class=HTMLResponse)
+async def clientes_page(request: Request):
+    """Página para ver información de clientes (datos en descripción)"""
+    return templates.TemplateResponse("clientes.html", {"request": request})
+
 
 
 if __name__ == "__main__":

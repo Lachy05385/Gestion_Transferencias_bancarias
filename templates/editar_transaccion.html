@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>✏️ Editar Transacción - Gestor Bancario</title>
+    <title>✏️ Editar Transacciones - Gestor Bancario</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
     <style>
         * {
             margin: 0;
@@ -19,30 +22,48 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
-        /* Header */
-        .header {
+        .navbar {
             background: white;
             border-radius: 15px;
-            padding: 20px 30px;
+            padding: 15px 25px;
             margin-bottom: 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 15px;
         }
 
-        .header h1 {
+        .logo {
+            font-size: 1.3em;
+            font-weight: bold;
             color: #333;
-            font-size: 1.8em;
+        }
+
+        .nav-links {
             display: flex;
-            align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            background: #f0f0f0;
+            color: #333;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }
+
+        .nav-links a:hover {
+            background: #667eea;
+            color: white;
         }
 
         .user-info {
@@ -51,124 +72,72 @@
             gap: 15px;
         }
 
-        .user-info span {
-            color: #666;
-        }
-
-        .user-info strong {
-            color: #667eea;
-        }
-
-        .btn-volver {
-            background: #718096;
-            color: white;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s;
-        }
-
-        .btn-volver:hover {
-            background: #4a5568;
-            transform: translateY(-2px);
-        }
-
         .logout-btn {
             background: #f56565;
             color: white;
             border: none;
-            padding: 8px 20px;
+            padding: 6px 15px;
             border-radius: 8px;
             cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
         }
 
-        .logout-btn:hover {
-            background: #e53e3e;
-            transform: translateY(-2px);
-        }
-
-        /* Búsqueda */
-        .search-section {
+        /* Filtros */
+        .filters-section {
             background: white;
             border-radius: 15px;
-            padding: 25px;
+            padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
 
-        .search-section h2 {
-            color: #333;
-            margin-bottom: 15px;
+        .filters-row {
             display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .search-box {
-            display: flex;
-            gap: 15px;
             flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
         }
 
-        .search-box input {
-            flex: 2;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1em;
-            transition: all 0.3s;
-        }
-
-        .search-box input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .search-box select {
+        .filter-group {
             flex: 1;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1em;
+            min-width: 150px;
         }
 
-        .search-box button {
-            padding: 12px 25px;
+        .filter-group label {
+            display: block;
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .filter-group input, .filter-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .btn-filter {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 10px;
+            padding: 10px 25px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
-            transition: all 0.3s;
         }
 
-        .search-box button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        .btn-clear {
+            background: #718096;
         }
 
-        /* Lista de transacciones */
-        .transactions-list {
+        /* Tabla */
+        .transactions-table {
             background: white;
             border-radius: 15px;
             overflow-x: auto;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            display: none;
-        }
-
-        .transactions-list.visible {
-            display: block;
-        }
-
-        .transactions-list h3 {
-            padding: 20px 20px 0;
-            color: #333;
         }
 
         table {
@@ -196,19 +165,30 @@
             background: #667eea;
             color: white;
             border: none;
-            padding: 6px 12px;
+            padding: 6px 15px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.85em;
-            transition: all 0.3s;
         }
 
         .edit-btn:hover {
             background: #5a67d8;
-            transform: scale(1.05);
         }
 
-        /* Modal de edición */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .badge-pendiente { background: #feebc8; color: #c05621; }
+        .badge-confirmada { background: #c6f6d5; color: #22543d; }
+        .badge-enviada { background: #fed7d7; color: #c53030; }
+        .badge-recibida { background: #c6f6d5; color: #22543d; }
+
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -228,13 +208,12 @@
 
         .modal-content {
             background: white;
-            border-radius: 20px;
+            border-radius: 15px;
             width: 90%;
-            max-width: 600px;
+            max-width: 550px;
             max-height: 90vh;
             overflow-y: auto;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 25px;
         }
 
         .modal-header {
@@ -242,53 +221,34 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
-            padding-bottom: 15px;
+            padding-bottom: 10px;
             border-bottom: 2px solid #e0e0e0;
-        }
-
-        .modal-header h3 {
-            color: #333;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         .close-modal {
             background: none;
             border: none;
-            font-size: 1.5em;
+            font-size: 24px;
             cursor: pointer;
             color: #999;
-            transition: all 0.3s;
-        }
-
-        .close-modal:hover {
-            color: #f56565;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .form-group label {
             display: block;
             font-weight: 600;
+            margin-bottom: 5px;
             color: #555;
-            margin-bottom: 8px;
         }
 
         .form-group input, .form-group select, .form-group textarea {
             width: 100%;
-            padding: 10px 12px;
+            padding: 10px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
-            font-size: 0.95em;
-            transition: all 0.3s;
-        }
-
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: #667eea;
         }
 
         .form-row {
@@ -300,46 +260,34 @@
         .modal-buttons {
             display: flex;
             gap: 15px;
-            margin-top: 25px;
+            margin-top: 20px;
         }
 
         .btn-save {
             flex: 1;
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            background: #48bb78;
             color: white;
             border: none;
             padding: 12px;
             border-radius: 8px;
-            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.4);
+            font-weight: 600;
         }
 
         .btn-cancel {
             flex: 1;
-            background: #e0e0e0;
-            color: #666;
+            background: #a0aec0;
+            color: white;
             border: none;
             padding: 12px;
             border-radius: 8px;
-            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-cancel:hover {
-            background: #c0c0c0;
+            font-weight: 600;
         }
 
         .loading {
             text-align: center;
             padding: 40px;
-            color: #667eea;
         }
 
         .spinner {
@@ -362,65 +310,72 @@
             color: #999;
         }
 
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: 600;
+        @media (max-width: 768px) {
+            .filters-row {
+                flex-direction: column;
+            }
+            .form-row {
+                grid-template-columns: 1fr;
+            }
         }
-
-        .badge-enviada { background: #fed7d7; color: #c53030; }
-        .badge-recibida { background: #c6f6d5; color: #22543d; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>
-                <span>✏️</span>
-                <span>Editar Transacciones</span>
-            </h1>
+        <!-- Navbar -->
+        <div class="navbar">
+            <div class="logo">✏️ Editar Transacciones</div>
+            <div class="nav-links">
+                <a href="/capturar" target="_blank">📱 Capturar</a>
+                <a href="/dashboard" target="_blank">📊 Dashboard</a>
+                <a href="/crear-transaccion" target="_blank">➕ Crear</a>
+                <a href="/subir-imagen" target="_blank">📸 Subir Imagen</a>
+                <a href="/clientes" target="_blank">👥 Clientes</a>
+                <a href="/eliminar-transaccion" target="_blank">🗑️ Eliminar</a>
+            </div>
             <div class="user-info">
-                <span>👤 <strong id="userName">Cargando...</strong></span>
-                <a href="/dashboard" class="btn-volver">📊 Dashboard</a>
+                <span>👤 <span id="userName">Cargando...</span></span>
                 <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
             </div>
         </div>
 
-        <!-- Búsqueda -->
-        <div class="search-section">
-            <h2>
-                <span>🔍</span>
-                <span>Buscar Transacción</span>
-            </h2>
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Buscar por N° transacción, beneficiario, ordenante o banco...">
-                <select id="tipoFilter">
-                    <option value="">Todos los tipos</option>
-                    <option value="enviada">📤 Enviadas</option>
-                    <option value="recibida">📥 Recibidas</option>
-                </select>
-                <button onclick="buscarTransacciones()">🔍 Buscar</button>
+        <!-- Filtros -->
+        <div class="filters-section">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label>🔍 Buscar</label>
+                    <input type="text" id="searchInput" placeholder="N° transacción, beneficiario, ordenante...">
+                </div>
+                <div class="filter-group">
+                    <label>📌 Tipo</label>
+                    <select id="tipoFilter">
+                        <option value="">Todos</option>
+                        <option value="enviada">📤 Enviadas</option>
+                        <option value="recibida">📥 Recibidas</option>
+                    </select>
+                </div>
+                <button class="btn-filter" onclick="buscarTransacciones()">🔍 Buscar</button>
+                <button class="btn-filter btn-clear" onclick="limpiarBusqueda()">🗑️ Limpiar</button>
             </div>
         </div>
 
-        <!-- Lista de transacciones -->
-        <div class="transactions-list" id="transactionsList">
-            <h3>📋 Resultados</h3>
+        <!-- Tabla -->
+        <div class="transactions-table">
+            <div id="loadingState" style="display: none;">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Cargando transacciones...</p>
+                </div>
+            </div>
             <div id="tableContainer"></div>
         </div>
     </div>
 
     <!-- Modal de edición -->
-    <div class="modal" id="editModal">
+    <div id="editModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>
-                    <span>✏️</span>
-                    <span>Editar Transacción</span>
-                </h3>
+                <h3>✏️ Editar Transacción</h3>
                 <button class="close-modal" onclick="cerrarModal()">&times;</button>
             </div>
             <div id="modalForm"></div>
@@ -428,9 +383,11 @@
     </div>
 
     <script>
-        const BASE_URL = 'http://localhost:8000';
+        //const BASE_URL = 'http://localhost:8000';
+        const BASE_URL = window.location.origin;
         let token = null;
         let user = null;
+        let transaccionActual = null;
 
         // ========== AUTENTICACIÓN ==========
         function getToken() {
@@ -481,58 +438,58 @@
             const searchTerm = document.getElementById('searchInput').value.trim();
             const tipo = document.getElementById('tipoFilter').value;
             const tableContainer = document.getElementById('tableContainer');
-            const transactionsList = document.getElementById('transactionsList');
+            const loadingDiv = document.getElementById('loadingState');
 
-            // 🔧 Validación: Si no hay término de búsqueda NI tipo seleccionado, mostrar un mensaje claro.
             if (!searchTerm && !tipo) {
-                alert('Por favor, ingresa un término de búsqueda o selecciona un tipo de transacción.');
+                alert('⚠️ Ingresa un término de búsqueda o selecciona un tipo');
                 return;
             }
 
-            // Si hay tipo pero no término de búsqueda, mostramos un mensaje informativo (opcional)
-            if (!searchTerm && tipo) {
-                if (!confirm(`Mostrar todas las transacciones de tipo "${tipo}"? Puede haber muchos resultados.`)) {
-                    return;
-                }
-            }
-
-            tableContainer.innerHTML = '<div class="loading"><div class="spinner"></div><p>Buscando...</p></div>';
-            transactionsList.classList.add('visible');
+            loadingDiv.style.display = 'block';
+            tableContainer.innerHTML = '';
 
             try {
-                // Construir URL correctamente con URLSearchParams
                 const params = new URLSearchParams();
-                
-                if (searchTerm) {
-                    params.append('q', searchTerm);
-                }
-                if (tipo) {
-                    params.append('tipo', tipo);
-                }
-                
+                if (searchTerm) params.append('q', searchTerm);
+                if (tipo) params.append('tipo', tipo);
+                params.append('skip', '0');
+                params.append('limit', '100');
+
                 const url = `${BASE_URL}/transacciones/buscar?${params.toString()}`;
-                console.log('📤 URL de búsqueda:', url);
-                
+                console.log('📤 URL:', url);
+
                 const response = await fetch(url, {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                    throw new Error(`Error ${response.status}: ${errorText}`);
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Error en la búsqueda');
                 }
 
                 const transacciones = await response.json();
                 console.log('📊 Transacciones recibidas:', transacciones.length);
-                mostrarResultados(transacciones);
+                
+                if (transacciones.length === 0) {
+                    // 👇 Mensaje más informativo
+                    tableContainer.innerHTML = `
+                        <div class="empty-message">
+                            📭 No se encontraron transacciones para "<strong>${searchTerm}</strong>"<br><br>
+                            <small>💡 Posibles razones:</small><br>
+                            <small>• La transacción fue creada por otro usuario (solo puedes editar tus propias transacciones)</small><br>
+                            <small>• El número de transacción o beneficiario no existe</small><br>
+                            <small>• Verifica que escribiste correctamente el término de búsqueda</small>
+                        </div>
+                    `;
+                } else {
+                    mostrarResultados(transacciones);
+                }
 
             } catch (error) {
-                console.error('Error en búsqueda:', error);
-                tableContainer.innerHTML = `<div class="empty-message">❌ Error al buscar: ${error.message}</div>`;
+                console.error('Error:', error);
+                tableContainer.innerHTML = `<div class="empty-message">❌ Error: ${error.message}</div>`;
+            } finally {
+                loadingDiv.style.display = 'none';
             }
         }
 
@@ -555,7 +512,8 @@
                             <th>Ordenante</th>
                             <th>Monto</th>
                             <th>Moneda</th>
-                            <th>Acciones</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -564,6 +522,7 @@
             for (const t of transacciones) {
                 const tipoClass = t.tipo === 'enviada' ? 'badge-enviada' : 'badge-recibida';
                 const tipoText = t.tipo === 'enviada' ? '📤 Enviada' : '📥 Recibida';
+                const estadoClass = t.estado === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada';
 
                 html += `
                     <tr>
@@ -572,8 +531,9 @@
                         <td><span class="badge ${tipoClass}">${tipoText}</span></td>
                         <td>${t.beneficiario || '-'}</td>
                         <td>${t.ordenante || '-'}</td>
-                        <td>${t.monto} ${t.moneda}</td>
-                        <td>${t.banco || '-'}</td>
+                        <td><strong>${t.monto.toFixed(2)}</strong> ${t.moneda}</td>
+                        <td>${t.moneda}</td>
+                        <td><span class="badge ${estadoClass}">${t.estado}</span></td>
                         <td><button class="edit-btn" onclick="abrirModal(${t.id})">✏️ Editar</button></td>
                     </tr>
                 `;
@@ -583,18 +543,37 @@
             tableContainer.innerHTML = html;
         }
 
-        // ========== MODAL DE EDICIÓN ==========
-        let transaccionActual = null;
+        function limpiarBusqueda() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('tipoFilter').value = '';
+            buscarTransacciones();
+        }
 
+        // ========== MODAL DE EDICIÓN ==========
         async function abrirModal(id) {
             try {
                 const response = await fetch(`${BASE_URL}/transacciones/${id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                if (!response.ok) throw new Error('Error al cargar la transacción');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        alert('❌ Transacción no encontrada. Es posible que fue eliminada o no te pertenece.');
+                    } else {
+                        const error = await response.json();
+                        alert(`❌ Error: ${error.detail}`);
+                    }
+                    return;
+                }
 
                 transaccionActual = await response.json();
+                
+                // Verificar si el usuario tiene permiso para editar
+                if (transaccionActual.usuario_id !== user.id) {
+                    alert('⚠️ Solo el usuario que creó la transacción puede editarla.\n\nSi necesitas modificarla, contacta al usuario que la procesó.');
+                    return;
+                }
+                
                 mostrarFormularioEdicion();
 
             } catch (error) {
@@ -606,7 +585,7 @@
         function mostrarFormularioEdicion() {
             const modal = document.getElementById('editModal');
             const modalForm = document.getElementById('modalForm');
-            
+
             modalForm.innerHTML = `
                 <form id="editForm" onsubmit="guardarCambios(event)">
                     <div class="form-row">
@@ -616,37 +595,37 @@
                         </div>
                         <div class="form-group">
                             <label>Banco</label>
-                            <input type="text" name="banco" value="${transaccionActual.banco || ''}" required minlength="2">
+                            <input type="text" name="banco" value="${transaccionActual.banco || ''}" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Beneficiario (Cuenta Destino)</label>
-                            <input type="text" name="beneficiario" value="${transaccionActual.beneficiario || ''}" required minlength="4">
+                            <label>Beneficiario</label>
+                            <input type="text" name="beneficiario" value="${transaccionActual.beneficiario || ''}" required>
                         </div>
                         <div class="form-group">
-                            <label>Ordenante (Cuenta Origen)</label>
-                            <input type="text" name="ordenante" value="${transaccionActual.ordenante || ''}" required minlength="4">
+                            <label>Ordenante</label>
+                            <input type="text" name="ordenante" value="${transaccionActual.ordenante || ''}" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Monto</label>
-                            <input type="number" step="0.01" name="monto" value="${transaccionActual.monto}" required min="0.01">
+                            <input type="number" step="0.01" name="monto" value="${transaccionActual.monto}" required>
                         </div>
                         <div class="form-group">
                             <label>Moneda</label>
                             <select name="moneda">
-                                <option value="CUP" ${transaccionActual.moneda === 'CUP' ? 'selected' : ''}>CUP - Peso Cubano</option>
-                                <option value="USD" ${transaccionActual.moneda === 'USD' ? 'selected' : ''}>USD - Dólar</option>
-                                <option value="EUR" ${transaccionActual.moneda === 'EUR' ? 'selected' : ''}>EUR - Euro</option>
-                                <option value="MLC" ${transaccionActual.moneda === 'MLC' ? 'selected' : ''}>MLC - Moneda Libremente Convertible</option>
+                                <option value="CUP" ${transaccionActual.moneda === 'CUP' ? 'selected' : ''}>CUP</option>
+                                <option value="USD" ${transaccionActual.moneda === 'USD' ? 'selected' : ''}>USD</option>
+                                <option value="EUR" ${transaccionActual.moneda === 'EUR' ? 'selected' : ''}>EUR</option>
+                                <option value="MLC" ${transaccionActual.moneda === 'MLC' ? 'selected' : ''}>MLC</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Número de Transacción</label>
-                        <input type="text" name="numero_transaccion" value="${transaccionActual.numero_transaccion || ''}" required minlength="4">
+                        <input type="text" name="numero_transaccion" value="${transaccionActual.numero_transaccion || ''}" required>
                     </div>
                     <div class="form-group">
                         <label>Descripción</label>
@@ -658,78 +637,58 @@
                     </div>
                 </form>
             `;
-            
+
             modal.classList.add('visible');
         }
+
         async function guardarCambios(event) {
             event.preventDefault();
-            
-            // 👇 FORMA CORRECTA de obtener todos los valores del formulario
-            const form = document.getElementById('editForm');
-            const formData = new FormData(form);
-            
-            // Extraer TODOS los campos manualmente (más confiable)
+
             const datosActualizados = {
-                banco: document.querySelector('[name="banco"]')?.value || '',
-                fecha: document.querySelector('[name="fecha"]')?.value || '',
-                beneficiario: document.querySelector('[name="beneficiario"]')?.value || '',
-                ordenante: document.querySelector('[name="ordenante"]')?.value || '',
-                monto: parseFloat(document.querySelector('[name="monto"]')?.value || 0),
-                moneda: document.querySelector('[name="moneda"]')?.value || 'CUP',
-                numero_transaccion: document.querySelector('[name="numero_transaccion"]')?.value || '',
-                descripcion: document.querySelector('[name="descripcion"]')?.value || '',
-                tipo: transaccionActual.tipo,  // 👈 Agregar tipo (se mantiene)
-                estado: transaccionActual.estado  // 👈 Agregar estado (se mantiene)
-                //etiquetas: []
+                fecha: document.querySelector('[name="fecha"]').value,
+                banco: document.querySelector('[name="banco"]').value,
+                beneficiario: document.querySelector('[name="beneficiario"]').value,
+                ordenante: document.querySelector('[name="ordenante"]').value,
+                monto: parseFloat(document.querySelector('[name="monto"]').value),
+                moneda: document.querySelector('[name="moneda"]').value,
+                numero_transaccion: document.querySelector('[name="numero_transaccion"]').value,
+                descripcion: document.querySelector('[name="descripcion"]').value
             };
-                    // 👇 VERIFICAR qué datos se están enviando
-            console.log('📤 DATOS A ENVIAR:', datosActualizados);
-            
-            // Validaciones
+
             if (datosActualizados.monto <= 0) {
                 alert('El monto debe ser mayor que 0');
                 return;
             }
-            
-            if (!datosActualizados.numero_transaccion) {
-                alert('El número de transacción es requerido');
-                return;
-            }
-            
+
             const saveBtn = document.querySelector('.btn-save');
             saveBtn.disabled = true;
-            saveBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;"></span> Guardando...';
-            
+            saveBtn.textContent = 'Guardando...';
+
             try {
                 const response = await fetch(`${BASE_URL}/transacciones/${transaccionActual.id}`, {
-                    method: 'PUT',  // Usamos PUT para actualizar todos los campos
+                    method: 'PATCH',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(datosActualizados)
                 });
-                
-                const data = await response.json();
-                console.log('📥 RESPUESTA:', data);
-                
-                if (response.ok) {
-                    alert('✅ Transacción actualizada correctamente');
-                    cerrarModal();
-                    buscarTransacciones(); // Refrescar lista
-                } else {
-                    let errorMsg = data.detail;
-                    if (Array.isArray(data.detail)) {
-                        errorMsg = data.detail.map(e => e.msg).join(', ');
-                    }
-                    alert('❌ Error al guardar: ' + errorMsg);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Error al guardar');
                 }
+
+                alert('✅ Transacción actualizada correctamente');
+                cerrarModal();
+                buscarTransacciones();
+
             } catch (error) {
                 console.error('Error:', error);
-                alert('❌ Error de conexión: ' + error.message);
+                alert('❌ Error: ' + error.message);
             } finally {
                 saveBtn.disabled = false;
-                saveBtn.innerHTML = '💾 Guardar Cambios';
+                saveBtn.textContent = '💾 Guardar Cambios';
             }
         }
 
@@ -742,6 +701,10 @@
         // ========== INICIALIZACIÓN ==========
         async function init() {
             await getUserProfile();
+            if (user) {
+                console.log('✅ Usuario autenticado:', user.email);
+                // No cargar transacciones automáticamente, esperar búsqueda del usuario
+            }
         }
 
         init();

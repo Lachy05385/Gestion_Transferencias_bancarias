@@ -120,7 +120,7 @@
             border-left: 4px solid #ed8936;
         }
         .stat-card.confirmadas {
-            border-left: 4px solid #48bb78;
+            border-left: 4px solid #10b499;
         }
         .stat-card.total {
             border-left: 4px solid #1e3c72;
@@ -429,6 +429,12 @@
                     <label>🔍 Buscar</label>
                     <input type="text" id="searchInput" placeholder="N° Transacción, beneficiario...">
                 </div>
+                <div class="filter-group">
+                    <label>👤 Filtrar por Usuario</label>
+                    <select id="filtroUsuario">
+                        <option value="">Todos los usuarios</option>
+                    </select>
+                </div>
                 <button class="btn-filter" onclick="aplicarFiltros()">🔍 Aplicar Filtros</button>
                 <button class="btn-filter btn-clear" onclick="limpiarFiltros()">🗑️ Limpiar</button>
             </div>
@@ -457,23 +463,22 @@
     </div>
 
     <script>
-        const BASE_URL = 'http://localhost:8000';
+        //const BASE_URL = 'http://localhost:8000';
+        // ========== CONFIGURACIÓN ==========
+        const BASE_URL = window.location.origin;
         let token = null;
         let user = null;
-        let tabActual = 'pendientes';
-        let transaccionesGlobal = [];
-        
+        let tabActual = 'pendientes';   // 'pendientes' o 'confirmadas'
+        let transaccionesGlobal = [];    // Todas las transacciones (sin filtrar por tab)
 
         // ========== AUTENTICACIÓN ==========
         function getToken() {
             const params = new URLSearchParams(window.location.search);
             const urlToken = params.get('token');
-            console.log
-            console.log(urlToken)
             if (urlToken) {
                 localStorage.setItem('token', urlToken);
                 return urlToken;
-            }
+            }const BASE_URL = window.location.origin;
             return localStorage.getItem('token');
         }
 
@@ -483,12 +488,10 @@
                 window.location.href = '/test';
                 return null;
             }
-
             try {
                 const response = await fetch(`${BASE_URL}/perfil`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
                 if (response.ok) {
                     user = await response.json();
                     document.getElementById('userName').textContent = `${user.nombre} ${user.apellido}`;
@@ -510,7 +513,7 @@
             window.location.href = '/test';
         }
 
-        // ========== INICIALIZAR DATE PICKERS ==========
+        // ========== DATE PICKERS ==========
         function initDatePickers() {
             flatpickr(".datepicker", {
                 locale: "es",
@@ -521,60 +524,94 @@
             });
         }
 
-        // ========== CARGAR TRANSACCIONES ==========
-        async function aplicarFiltros() {
+        // ========== CARGAR USUARIOS (SELECT) ==========
+        async function cargarUsuariosEmpresa() {
+            try {
+                const response = await fetch(`${BASE_URL}/empresa/usuarios`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const usuarios = await response.json();
+                    const selectUsuario = document.getElementById('filtroUsuario');
+                    if (selectUsuario) {
+                        selectUsuario.innerHTML = '<option value="">📋 Todos los usuarios</option>';
+                        for (const u of usuarios) {
+                            selectUsuario.innerHTML += `<option value="${u.id}">👤 ${u.nombre} ${u.apellido} (${u.email})</option>`;
+                        }
+                        // Agregar evento change para recargar transacciones al cambiar usuario
+                        selectUsuario.addEventListener('change', () => cargarTransacciones());
+                        console.log('✅ Usuarios cargados:', usuarios.length);
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando usuarios:', error);
+            }
+        }
+
+        // ========== CARGAR TRANSACCIONES (ÚNICA FUNCIÓN) ==========
+        async function cargarTransacciones() {
             if (!token) return;
 
+            // Obtener valores de los filtros
+            const usuarioId = document.getElementById('filtroUsuario')?.value || '';
             const fechaInicio = document.getElementById('fechaInicio')?.value || '';
             const fechaFin = document.getElementById('fechaFin')?.value || '';
             const filtroBanco = document.getElementById('filtroBanco')?.value || '';
             const searchInput = document.getElementById('searchInput')?.value || '';
 
+            // Mostrar loading
             const loadingDiv = document.getElementById('loadingState');
             const tableContainer = document.getElementById('tableContainer');
-            
             if (loadingDiv) loadingDiv.style.display = 'block';
             if (tableContainer) tableContainer.innerHTML = '';
 
             try {
-                const params = new URLSearchParams();
-                if (fechaInicio) params.append('fecha_inicio', fechaInicio);
-                if (fechaFin) params.append('fecha_fin', fechaFin);
-                if (filtroBanco) params.append('banco', filtroBanco);
-                console.log(fechaInicio)
-                console.log(fechaFin)
+                // Construir URL con endpoint para contador (filtra por usuario y empresa automáticamente)
+                let url = `${BASE_URL}/transacciones/empresa?skip=0&limit=500`;
                 
-                // Para búsqueda por texto
-                let url = `${BASE_URL}/transacciones/?${params.toString()}`;
+                if (usuarioId) url += `&usuario_id=${usuarioId}`;
+                if (fechaInicio) url += `&fecha_inicio=${fechaInicio}`;
+                if (fechaFin) url += `&fecha_fin=${fechaFin}`;
                 
-                // Si hay búsqueda, usar el endpoint de búsqueda
-                if (searchInput) {
-                    url = `${BASE_URL}/transacciones/buscar?q=${encodeURIComponent(searchInput)}`;
-                    if (fechaInicio) url += `&fecha_inicio=${fechaInicio}`;
-                    if (fechaFin) url += `&fecha_fin=${fechaFin}`;
-                }
-                
-                console.log('📤 URL:', url);
+                // Si hay búsqueda por texto, usar el endpoint de búsqueda (no soporta usuario_id directamente, haremos filtro en cliente)
+                // Nota: El endpoint /transacciones/buscar no incluye empresa/usuario, por simplicidad usamos /empresa y filtramos en cliente.
+                // Si el backend tiene búsqueda con contexto de empresa, se puede ajustar.
                 
                 const response = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
-                if (!response.ok) throw new Error('Error al cargar transacciones');
-
-                let transacciones = await response.json();
                 
-                // Aplicar filtro de banco en cliente si es necesario
-                if (filtroBanco && !searchInput) {
-                    transacciones = transacciones.filter(t =>
+                if (!response.ok) throw new Error('Error al cargar transacciones');
+                
+                let transacciones = await response.json();
+                console.log('📊 Transacciones recibidas:', transacciones.length);
+                
+                // Aplicar filtros adicionales en cliente (banco y búsqueda)
+                if (filtroBanco) {
+                    transacciones = transacciones.filter(t => 
                         t.banco && t.banco.toLowerCase().includes(filtroBanco.toLowerCase())
                     );
                 }
+                if (searchInput) {
+                    const term = searchInput.toLowerCase();
+                    transacciones = transacciones.filter(t => 
+                        (t.numero_transaccion && t.numero_transaccion.toLowerCase().includes(term)) ||
+                        (t.beneficiario && t.beneficiario.toLowerCase().includes(term)) ||
+                        (t.ordenante && t.ordenante.toLowerCase().includes(term))
+                    );
+                }
+                
+                // Ordenar por fecha descendente
+                transacciones.sort((a, b) => {
+                    const fechaA = a.fecha ? a.fecha.split('/').reverse().join('-') : '';
+                    const fechaB = b.fecha ? b.fecha.split('/').reverse().join('-') : '';
+                    return fechaB.localeCompare(fechaA);
+                });
                 
                 transaccionesGlobal = transacciones;
-                calcularEstadisticas();
-                mostrarTabla();
-
+                actualizarEstadisticas();
+                renderizarTabla();
+                
             } catch (error) {
                 console.error('Error:', error);
                 if (tableContainer) {
@@ -585,31 +622,27 @@
             }
         }
 
-        function calcularEstadisticas() {
-            const pendientes = transaccionesGlobal.filter(t => t.estado === 'PENDIENTE');
-            const confirmadas = transaccionesGlobal.filter(t => t.estado === 'CONFIRMADA');
-           // console.log("Transacciones Pendientes "+pendientes)
+        // ========== ACTUALIZAR TARJETAS DE ESTADÍSTICAS ==========
+        function actualizarEstadisticas() {
+            const pendientes = transaccionesGlobal.filter(t => t.estado && t.estado.toUpperCase() === 'PENDIENTE');
+            const confirmadas = transaccionesGlobal.filter(t => t.estado && t.estado.toUpperCase() === 'CONFIRMADA');
             document.getElementById('totalPendientes').textContent = pendientes.length;
             document.getElementById('totalConfirmadas').textContent = confirmadas.length;
             document.getElementById('totalTransacciones').textContent = transaccionesGlobal.length;
         }
 
-        function mostrarTabla() {
+        // ========== RENDERIZAR TABLA SEGÚN TAB ACTIVA (pendientes/confirmadas) ==========
+        function renderizarTabla() {
             const tableContainer = document.getElementById('tableContainer');
             
-            // Normalizar estados para comparación (ambos a mayúsculas o ambos a minúsculas)
-            let transacciones = transaccionesGlobal;
+            let transaccionesFiltradas = transaccionesGlobal;
             if (tabActual === 'pendientes') {
-                transacciones = transaccionesGlobal.filter(t => 
-                    t.estado && t.estado.toUpperCase() === 'PENDIENTE'
-                );
+                transaccionesFiltradas = transaccionesGlobal.filter(t => t.estado && t.estado.toUpperCase() === 'PENDIENTE');
             } else {
-                transacciones = transaccionesGlobal.filter(t => 
-                    t.estado && t.estado.toUpperCase() === 'CONFIRMADA'
-                );
+                transaccionesFiltradas = transaccionesGlobal.filter(t => t.estado && t.estado.toUpperCase() === 'CONFIRMADA');
             }
             
-            if (transacciones.length === 0) {
+            if (transaccionesFiltradas.length === 0) {
                 tableContainer.innerHTML = `<div class="empty-message">📭 No hay transacciones ${tabActual === 'pendientes' ? 'pendientes' : 'confirmadas'}</div>`;
                 return;
             }
@@ -620,7 +653,7 @@
                         <tr>
                             <th>Fecha</th>
                             <th>N° Transacción</th>
-                            <th>Tipo</th>
+                            <th>Usuario que Procesó</th>
                             <th>Beneficiario</th>
                             <th>Ordenante</th>
                             <th>Monto</th>
@@ -633,31 +666,26 @@
                     <tbody>
             `;
             
-            for (const t of transacciones) {
-                const tipoText = t.tipo === 'enviada' ? '📤 Enviada' : '📥 Recibida';
-                const estadoActual = t.estado ? t.estado.toUpperCase() : 'PENDIENTE';
+            for (const t of transaccionesFiltradas) {
+                const estadoMayus = (t.estado || '').toUpperCase();
+                const estadoClass = estadoMayus === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada';
+                const usuarioNombre = t.usuario ? `${t.usuario.nombre} ${t.usuario.apellido}` : (t.usuario_id || '-');
                 
                 html += `
                     <tr data-id="${t.id}">
                         <td>${t.fecha || '-'}</td>
                         <td><strong>${t.numero_transaccion || '-'}</strong></td>
-                        <td>${tipoText}</td>
+                        <td>${usuarioNombre}</td>
                         <td>${t.beneficiario || '-'}</td>
                         <td>${t.ordenante || '-'}</td>
-                        <td><strong>${(t.monto || 0).toFixed(2)}</strong> ${t.moneda}</td>
-                        <td>${t.moneda}</td>
+                        <td><strong>${(t.monto || 0).toFixed(2)}</strong> ${t.moneda || ''}</td>
+                        <td>${t.moneda || '-'}</td>
                         <td>${t.banco || '-'}</td>
-                        <td><span class="badge ${estadoActual === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada'}" id="estado-${t.id}">
-                            ${estadoActual === 'PENDIENTE' ? 'PENDIENTE' : 'CONFIRMADA'}
-                        </span></td>
+                        <td><span class="badge ${estadoClass}">${estadoMayus === 'PENDIENTE' ? 'PENDIENTE' : 'CONFIRMADA'}</span></td>
                         <td>
-                            ${estadoActual === 'PENDIENTE' ? 
-                                `<button class="btn-confirmar" onclick="confirmarTransaccion(${t.id})">
-                                    ✅ Confirmar
-                                </button>` : 
-                                `<button class="btn-revertir" onclick="revertirTransaccion(${t.id})" style="background:#ed8936; color:white; border:none; padding:6px 15px; border-radius:6px; cursor:pointer;">
-                                    ↩️ Revertir a Pendiente
-                                </button>`
+                            ${estadoMayus === 'PENDIENTE' ? 
+                                `<button class="btn-confirmar" onclick="confirmarTransaccion(${t.id})">✅ Confirmar</button>` : 
+                                `<button class="btn-revertir" onclick="revertirTransaccion(${t.id})" style="background:#ed8936; color:white; border:none; padding:6px 15px; border-radius:6px; cursor:pointer;">↩️ Revertir a Pendiente</button>`
                             }
                         </td>
                     </tr>
@@ -668,14 +696,12 @@
                     </tbody>
                 </table>
             `;
-            
             tableContainer.innerHTML = html;
         }
 
+        // ========== CONFIRMAR TRANSACCIÓN ==========
         async function confirmarTransaccion(id) {
-            const confirmar = confirm('¿Confirmar que esta transacción ya aparece en el estado de cuenta?');
-            if (!confirmar) return;
-            
+            if (!confirm('¿Confirmar que esta transacción ya aparece en el estado de cuenta?')) return;
             try {
                 const response = await fetch(`${BASE_URL}/transacciones/${id}/confirmar`, {
                     method: 'POST',
@@ -684,109 +710,50 @@
                         'Content-Type': 'application/json'
                     }
                 });
-                
                 if (response.ok) {
                     mostrarMensaje('✅ Transacción confirmada correctamente', 'exito');
-                    
-                    // Actualizar localmente el estado
+                    // Actualizar localmente
                     const transaccion = transaccionesGlobal.find(t => t.id === id);
-                    if (transaccion) {
-                        transaccion.estado = 'CONFIRMADA';
-                        transaccion.fecha_confirmacion = new Date().toISOString();
-                    }
-                    
-                    // Actualizar estadísticas y tabla
-                    calcularEstadisticas();
-                    mostrarTabla();
+                    if (transaccion) transaccion.estado = 'CONFIRMADA';
+                    actualizarEstadisticas();
+                    renderizarTabla();
                 } else {
                     const error = await response.json();
                     throw new Error(error.detail || 'Error al confirmar');
                 }
             } catch (error) {
-                console.error('Error:', error);
                 mostrarMensaje(`❌ Error: ${error.message}`, 'error');
             }
-        }
-        async function revertirTransaccion(id) {
-            const confirmar = confirm('¿Revertir esta transacción a PENDIENTE? Esto significa que aún no aparece en el estado de cuenta.');
-            if (!confirmar) return;
-            
-            try {
-                const response = await fetch(`${BASE_URL}/transacciones/${id}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ estado: 'PENDIENTE' })
-                });
-                
-                if (response.ok) {
-                    mostrarMensaje('✅ Transacción revertida a PENDIENTE', 'exito');
-                    
-                    // Actualizar localmente el estado
-                    const transaccion = transaccionesGlobal.find(t => t.id === id);
-                    if (transaccion) {
-                        transaccion.estado = 'PENDIENTE';
-                        transaccion.fecha_confirmacion = null;
-                    }
-                    
-                    // Actualizar estadísticas y tabla
-                    calcularEstadisticas();
-                    mostrarTabla();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Error al revertir');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje(`❌ Error: ${error.message}`, 'error');
-            }
-        }
-        async function revertirTransaccion(id) {
-            const confirmar = confirm('¿Revertir esta transacción a PENDIENTE? Esto significa que aún no aparece en el estado de cuenta.');
-            if (!confirmar) return;
-            
-            try {
-                const response = await fetch(`${BASE_URL}/transacciones/${id}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ estado: 'PENDIENTE' })
-                });
-                
-                if (response.ok) {
-                    mostrarMensaje('✅ Transacción revertida a PENDIENTE', 'exito');
-                    
-                    // Actualizar localmente el estado
-                    const transaccion = transaccionesGlobal.find(t => t.id === id);
-                    if (transaccion) {
-                        transaccion.estado = 'PENDIENTE';
-                        transaccion.fecha_confirmacion = null;
-                    }
-                    
-                    // Actualizar estadísticas y tabla
-                    calcularEstadisticas();
-                    mostrarTabla();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Error al revertir');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje(`❌ Error: ${error.message}`, 'error');
-            }
-        }
-        function mostrarMensaje(mensaje, tipo) {
-            const msgDiv = document.createElement('div');
-            msgDiv.textContent = mensaje;
-            msgDiv.className = `mensaje-flotante mensaje-${tipo === 'exito' ? 'exito' : 'error'}`;
-            document.body.appendChild(msgDiv);
-            setTimeout(() => msgDiv.remove(), 3000);
         }
 
+        // ========== REVERTIR TRANSACCIÓN ==========
+        async function revertirTransaccion(id) {
+            if (!confirm('¿Revertir esta transacción a PENDIENTE? Esto significa que aún no aparece en el estado de cuenta.')) return;
+            try {
+                const response = await fetch(`${BASE_URL}/transacciones/${id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ estado: 'pendiente' })
+                });
+                if (response.ok) {
+                    mostrarMensaje('✅ Transacción revertida a PENDIENTE', 'exito');
+                    const transaccion = transaccionesGlobal.find(t => t.id === id);
+                    if (transaccion) transaccion.estado = 'PENDIENTE';
+                    actualizarEstadisticas();
+                    renderizarTabla();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Error al revertir');
+                }
+            } catch (error) {
+                mostrarMensaje(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ========== CAMBIAR TAB (PENDIENTES / CONFIRMADAS) ==========
         function cambiarTab(tab) {
             tabActual = tab;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -795,7 +762,12 @@
             } else {
                 document.querySelector('.tab-btn.confirmadas').classList.add('active');
             }
-            mostrarTabla();
+            renderizarTabla(); // Solo cambia la vista, no recarga datos
+        }
+
+        // ========== APLICAR FILTROS (desde botón) ==========
+        function aplicarFiltros() {
+            cargarTransacciones(); // Recarga desde el backend con todos los filtros actuales (incluyendo usuario)
         }
 
         function limpiarFiltros() {
@@ -803,7 +775,17 @@
             document.getElementById('fechaFin').value = '';
             document.getElementById('filtroBanco').value = '';
             document.getElementById('searchInput').value = '';
-            aplicarFiltros();
+            // No limpiamos el usuario seleccionado para no confundir, pero se puede hacer si se desea:
+            // document.getElementById('filtroUsuario').value = '';
+            cargarTransacciones();
+        }
+
+        function mostrarMensaje(mensaje, tipo) {
+            const msgDiv = document.createElement('div');
+            msgDiv.textContent = mensaje;
+            msgDiv.className = `mensaje-flotante mensaje-${tipo === 'exito' ? 'exito' : 'error'}`;
+            document.body.appendChild(msgDiv);
+            setTimeout(() => msgDiv.remove(), 3000);
         }
 
         // ========== INICIALIZACIÓN ==========
@@ -811,7 +793,8 @@
             await getUserProfile();
             if (user) {
                 initDatePickers();
-                await aplicarFiltros();
+                await cargarUsuariosEmpresa();  // Llena el select y asigna evento change
+                await cargarTransacciones();     // Carga las transacciones (sin filtro de usuario inicialmente)
             }
         }
 

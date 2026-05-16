@@ -18,6 +18,23 @@ class EstadoTransaccion(str, Enum):
     RECHAZADA = "rechazada"
 
 # ====================== ESQUEMAS DE AUTENTICACIÓN ======================
+class EmpresaBase(BaseModel):
+    nombre: str = Field(..., min_length=2, max_length=100)
+    nit: str = Field(..., min_length=3, max_length=50)
+    direccion: Optional[str] = Field(None, max_length=200)
+    telefono: Optional[str] = Field(None, max_length=20)
+
+class EmpresaCreate(EmpresaBase):
+    pass
+
+class EmpresaResponse(EmpresaBase):
+    id: int
+    fecha_creacion: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+
 class UserCreate(BaseModel):
     email: EmailStr = Field(..., description="Email del usuario")
     nombre: str = Field(..., min_length=2, max_length=50, 
@@ -26,6 +43,8 @@ class UserCreate(BaseModel):
                          description="Apellido del usuario (2-50 caracteres)")
     password: str = Field(..., min_length=6, max_length=128,
                          description="Contraseña (mínimo 6 caracteres)")
+    rol: Optional[str] = "usuario"
+    empresa_id: Optional[int] = None
     
     @field_validator('nombre', 'apellido')
     @classmethod
@@ -55,9 +74,27 @@ class UserResponse(BaseModel):
     nombre: str
     apellido: str
     esta_activo: bool
+    rol: str
+    empresa_id: int
     fecha_creacion: datetime
     
+    empresa: Optional[EmpresaResponse] = None
+    
     model_config = ConfigDict(from_attributes=True)
+    
+
+# schemas.py - Agregar este schema
+
+class UserUpdate(BaseModel):
+    """Schema para actualizar usuario (todos los campos opcionales)"""
+    nombre: Optional[str] = Field(None, min_length=2, max_length=50)
+    apellido: Optional[str] = Field(None, min_length=2, max_length=50)
+    rol: Optional[str] = None
+    empresa_id: Optional[int] = None
+    esta_activo: Optional[bool] = None
+    password: Optional[str] = Field(None, min_length=6)
+    
+    
 
 class Token(BaseModel):
     access_token: str
@@ -151,10 +188,17 @@ class TransaccionParseRequest(BaseModel):
                                       description="Descripción opcional")
 
 class TransaccionUpdate(BaseModel):
-    tipo: Optional[TipoTransaccion] = Field(None, description="Tipo de transacción")
-    estado: Optional[EstadoTransaccion] = Field(None, description="Estado")
-    descripcion: Optional[str] = Field(None, max_length=200, description="Descripción")
-    etiquetas: Optional[List[str]] = Field(None, description="Etiquetas")
+    """Campos que se pueden actualizar (todos opcionales)"""
+    tipo: Optional[TipoTransaccion] = None
+    estado: Optional[EstadoTransaccion] = None
+    descripcion: Optional[str] = None
+    etiquetas: Optional[List[str]] = None
+    monto: Optional[float] = Field(None, gt=0)           # 👈 Monto
+    fecha: Optional[str] = None                          # 👈 Fecha
+    banco: Optional[str] = None                          # 👈 Banco
+    beneficiario: Optional[str] = None                   # 👈 Beneficiario
+    ordenante: Optional[str] = None                      # 👈 Ordenante
+    moneda: Optional[str] = None                         # 👈 Moneda
     
     @field_validator('descripcion')
     @classmethod
@@ -173,12 +217,15 @@ class EstadoUpdate(BaseModel):
 class TransaccionResponse(TransaccionBase):
     id: int
     usuario_id: int
+    empresa_id: int
     tipo: TipoTransaccion
     estado: EstadoTransaccion
     descripcion: str
     etiquetas: List[str]  # Debe ser List, no str
     fecha_procesamiento: datetime
     fecha_confirmacion: Optional[datetime] = None
+    usuario: Optional[UserResponse] = None
+    
     
     @field_validator('etiquetas', mode='before')
     @classmethod
@@ -491,5 +538,22 @@ class PlantillaTransaccion(BaseModel):
     tipo: TipoTransaccion
     etiquetas: List[str]
     usuario_id: int
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+# schemas.py - Agregar
+
+class OpinionCreate(BaseModel):
+    titulo: str = Field(..., min_length=3, max_length=100)
+    mensaje: str = Field(..., min_length=10, max_length=1000)
+    puntuacion: int = Field(5, ge=1, le=5)
+
+class OpinionResponse(BaseModel):
+    id: int
+    usuario_nombre: str
+    titulo: str
+    mensaje: str
+    puntuacion: int
+    fecha: datetime
     
     model_config = ConfigDict(from_attributes=True)
