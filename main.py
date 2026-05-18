@@ -24,6 +24,7 @@ from fastapi.responses import HTMLResponse
 from fastapi import APIRouter, Request
 from app.models import EstadoTransaccion
 from app.auth import get_password_hash
+from app.auth import verify_password
 
 
 # Crear tablas
