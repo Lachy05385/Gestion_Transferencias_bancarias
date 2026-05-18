@@ -1990,7 +1990,3 @@ async def clientes_page(request: Request):
     return templates.TemplateResponse("clientes.html", {"request": request})
 
 
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
