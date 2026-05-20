@@ -243,15 +243,21 @@ def actualizar_usuario(
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
+    print("Buscando al usuario con id: ", usuario_id)
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        # 🔴 Directly raise a 404 error.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Usuario con id {usuario_id} no encontrado"
+        )
     """
     Actualizar nombre, apellido o contraseña de un usuario.
     - El email NO se puede modificar.
     - Si se envía nueva_password, se requiere password_actual (a menos que el usuario sea admin).
     """
     # Verificar que el usuario existe
-    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    print("Usuario Encontrado ", usuario)
 
     # Permisos: solo el mismo usuario o un admin
     if current_user.id != usuario_id and current_user.rol != "admin":
@@ -312,24 +318,21 @@ def eliminar_usuario(
 @app.put("/admin/usuarios/{usuario_id}", response_model=schemas.UserResponse)
 def editar_usuario(
     usuario_id: int,
-    usuario_update: schemas.UserUpdate,  # Necesitas crear este schema
+    usuario_update: schemas.UserUpdate,
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Editar un usuario (solo administradores)
     """
-    
-    print("Modificacion de usuario  ",usuario_update)
     if current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
     
-    # Buscar usuario
     usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    # Actualizar campos permitidos
+    # Actualizar campos
     if usuario_update.nombre is not None:
         usuario.nombre = usuario_update.nombre
     if usuario_update.apellido is not None:
@@ -337,20 +340,24 @@ def editar_usuario(
     if usuario_update.rol is not None:
         usuario.rol = usuario_update.rol
     if usuario_update.empresa_id is not None:
-        # Verificar que la empresa existe
         empresa = db.query(models.Empresa).filter(models.Empresa.id == usuario_update.empresa_id).first()
         if not empresa:
             raise HTTPException(status_code=400, detail="La empresa no existe")
         usuario.empresa_id = usuario_update.empresa_id
     if usuario_update.esta_activo is not None:
         usuario.esta_activo = usuario_update.esta_activo
-    
-    # Si se envía nueva contraseña, actualizarla
     if usuario_update.password is not None and usuario_update.password.strip():
         usuario.hashed_password = auth.get_password_hash(usuario_update.password)
     
-    db.commit()
-    db.refresh(usuario)
+    try:
+        db.commit()
+        db.refresh(usuario)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al guardar: {str(e)}")
+    
+    # 👇 IMPORTANTE: retornar el usuario actualizado
+    return usuario
     
 @app.patch("/admin/usuarios/{usuario_id}/desactivar")
 def desactivar_usuario(

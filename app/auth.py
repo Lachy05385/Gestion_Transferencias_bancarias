@@ -12,7 +12,7 @@ import os
 # Configuración
 SECRET_KEY = os.getenv("SECRET_KEY", "clave_secreta_super_segura_aqui_cambiar_en_produccion")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 500
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Configurar CryptContext con Argon2 - VERSIÓN CORREGIDA
 # Quitamos el parámetro 'encoding' que no es soportado
