@@ -1,1 +1,2 @@
-web: uvicorn main:app --host 0.0.0.0 --port $PORT
+web: python -c "print('Hello from Railway')"
+#web: uvicorn main:app --host 0.0.0.0 --port $PORT
