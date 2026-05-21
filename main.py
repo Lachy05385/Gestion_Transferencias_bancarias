@@ -318,21 +318,29 @@ def eliminar_usuario(
 @app.put("/admin/usuarios/{usuario_id}", response_model=schemas.UserResponse)
 def editar_usuario(
     usuario_id: int,
-    usuario_update: schemas.UserUpdate,
+    usuario_update: schemas.UserUpdate,  # Necesitas crear este schema
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Editar un usuario (solo administradores)
     """
+    
+    print("Modificacion de usuario  ",usuario_update)
     if current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
     
+    # Buscar usuario
     usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    
+    
+    
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    # Actualizar campos
+    #print("usuario encontrado para modificar : ", usuario)
+    
+    # Actualizar campos permitidos
     if usuario_update.nombre is not None:
         usuario.nombre = usuario_update.nombre
     if usuario_update.apellido is not None:
@@ -340,24 +348,20 @@ def editar_usuario(
     if usuario_update.rol is not None:
         usuario.rol = usuario_update.rol
     if usuario_update.empresa_id is not None:
+        # Verificar que la empresa existe
         empresa = db.query(models.Empresa).filter(models.Empresa.id == usuario_update.empresa_id).first()
         if not empresa:
             raise HTTPException(status_code=400, detail="La empresa no existe")
         usuario.empresa_id = usuario_update.empresa_id
     if usuario_update.esta_activo is not None:
         usuario.esta_activo = usuario_update.esta_activo
+    
+    # Si se envía nueva contraseña, actualizarla
     if usuario_update.password is not None and usuario_update.password.strip():
         usuario.hashed_password = auth.get_password_hash(usuario_update.password)
     
-    try:
-        db.commit()
-        db.refresh(usuario)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al guardar: {str(e)}")
-    
-    # 👇 IMPORTANTE: retornar el usuario actualizado
-    return usuario
+    db.commit()
+    db.refresh(usuario)
     
 @app.patch("/admin/usuarios/{usuario_id}/desactivar")
 def desactivar_usuario(
@@ -1066,12 +1070,15 @@ def confirmar_transaccion(
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
+
     """Confirmar una transacción recibida"""
     transaccion = crud.confirmar_transaccion(
         db=db,
         transaccion_id=transaccion_id,
         usuario_id=current_user.id
     )
+    
+
     if transaccion is None:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     return transaccion
