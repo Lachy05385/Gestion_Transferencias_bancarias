@@ -6,7 +6,7 @@ from datetime import datetime
 import json
 import re
 from typing import List, Optional
-from app.auth import get_password_hash 
+from app.auth import get_password_hash, get_current_user 
 
 
 def get_user(db: Session, user_id: int):
@@ -42,13 +42,16 @@ def create_user(db: Session, user: schemas.UserCreate):
 
 
 
-def create_transaccion(db: Session, transaccion: schemas.TransaccionCreate, usuario_id: int):
+def create_transaccion(db: Session, transaccion: schemas.TransaccionCreate, usuario_id: int, empresa_id:int):
     """
     Crear una transacción manualmente asociada al usuario
     """
+    
+    
     estado_valor = getattr(transaccion, 'estado', models.EstadoTransaccion.PENDIENTE)
     db_transaccion = models.Transaccion(
         usuario_id=usuario_id,
+        empresa_id=empresa_id,
         banco=transaccion.banco,
         fecha=transaccion.fecha,
         beneficiario=transaccion.beneficiario,

@@ -668,7 +668,7 @@ async def recibir_transaccion(
         # 2. Verificar si existe para OTRO usuario de la misma empresa
         transaccion_otro_usuario = db.query(models.Transaccion).filter(
             models.Transaccion.numero_transaccion == numero_transaccion,
-            models.Transaccion.empresa_id == current_user.empresa_id,
+            #models.Transaccion.empresa_id == current_user.empresa_id,
             models.Transaccion.usuario_id != current_user.id
         ).first()
         
@@ -833,11 +833,16 @@ def crear_transaccion(
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    
+    #==============================================
+    print("Transaccion manual Obtenida ", transaccion.model_dump())
+   
+    #==============================================
     """Crear transacción manualmente"""
     print(transaccion)
     print("tipo de dato ",type(transaccion))
-    return crud.create_transaccion(db=db, transaccion=transaccion, usuario_id=current_user.id)
+    return crud.create_transaccion(db=db, transaccion=transaccion, 
+                                   usuario_id=current_user.id,
+                                   empresa_id=current_user.empresa_id)
 
 def get_transacciones_empresa(db: Session, empresa_id: int, **filtros):
     """Obtener transacciones de una empresa"""
