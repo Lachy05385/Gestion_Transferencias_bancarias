@@ -188,12 +188,13 @@ def confirmar_transaccion(db: Session, transaccion_id: int, usuario_id: int):
         return None
     
     # Solo se pueden confirmar transacciones RECIBIDAS
-    if db_transaccion.tipo == models.TipoTransaccion.RECIBIDA:
-        db_transaccion.estado = models.EstadoTransaccion.CONFIRMADA
-        db_transaccion.fecha_confirmacion = datetime.now()
-        db.commit()
-        db.refresh(db_transaccion)
-    
+    # ESTO LO DESACTIVE PARA PODER CONFIRMARLAS TODAS 
+    #if db_transaccion.tipo == models.TipoTransaccion.RECIBIDA:
+    db_transaccion.estado = models.EstadoTransaccion.CONFIRMADA
+    db_transaccion.fecha_confirmacion = datetime.now()
+    db.commit()
+    db.refresh(db_transaccion)
+
     return db_transaccion
 
 def get_resumen_transacciones(db: Session, usuario_id: int):
