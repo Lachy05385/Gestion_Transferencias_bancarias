@@ -220,8 +220,18 @@ def listar_usuarios(
 
 
 @app.post("/registro", response_model=schemas.UserResponse)
-def registrar_usuario(usuario: schemas.UserCreate, db: Session = Depends(get_db)):
-    print("recibido", usuario)
+def registrar_usuario(
+    usuario: schemas.UserCreate,
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    # Verificar si el usuario actual es administrador
+    if not current_user.is_admin:  # o current_user.role != "admin"
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permisos de administrador para registrar usuarios"
+        )
+    
     db_user = crud.get_user_by_email(db, email=usuario.email)
     if db_user:
         raise HTTPException(
