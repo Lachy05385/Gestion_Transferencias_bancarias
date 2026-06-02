@@ -6,6 +6,18 @@ import os
 # SQLite database
 SQLALCHEMY_DATABASE_URL = "sqlite:///./banco.db"
 #SQLALCHEMY_DATABASE_URL = "sqlite:///./data/bancaria.db"
+
+# Crea la carpeta si no existe
+os.makedirs(os.path.dirname(SQLALCHEMY_DATABASE_URL.replace("sqlite:///", "")), exist_ok=True)
+
+# Crea el engine
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}  # necesario para SQLite
+)
+
+
+
+
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )

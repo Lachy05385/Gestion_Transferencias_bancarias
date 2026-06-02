@@ -1,5 +1,5 @@
 # crear_admin.py
-from app.auth import get_password_hash
+from auth import get_password_hash
 from app.database import SessionLocal
 from app import models
 
@@ -8,7 +8,7 @@ def crear_admin():
     
     admin = models.Usuario(
         email="admin@localhost",
-        nombre="Admin",
+        nombre="admin",
         apellido="Sistema",
         hashed_password=get_password_hash("admin123"),
         esta_activo=True,
