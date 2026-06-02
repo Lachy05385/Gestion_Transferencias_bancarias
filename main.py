@@ -874,6 +874,8 @@ def listar_transacciones(
 ):
     # Usuario ve transacciones de su empresa
     transacciones = get_transacciones_empresa(db, current_user.empresa_id)
+    
+    
     return transacciones
 
 
@@ -2017,6 +2019,83 @@ def ver_transacciones_usuario(
 async def clientes_page(request: Request):
     """Página para ver información de clientes (datos en descripción)"""
     return templates.TemplateResponse("clientes.html", {"request": request})
+
+
+# ======== SALVA BD ===============
+from fastapi.responses import FileResponse
+import shutil
+import os
+
+
+@app.get("/admin/backup-db")
+def backup_database(current_user: models.Usuario = Depends(auth.get_current_active_user)):
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    backup_filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    backup_path = f"/tmp/{backup_filename}"
+    try:
+        # Copia el archivo de la base de datos desde el volumen a una ubicación temporal
+        shutil.copy2("/data/banco.db",backup_path)
+        return FileResponse(backup_path, media_type='application/octet-stream', filename=backup_filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear el respaldo: {str(e)}")
+
+
+# EXPORTAR A CSV
+import csv
+from fastapi.responses import StreamingResponse
+import io
+from datetime import datetime
+
+@app.get("/admin/exportar-csv")
+def exportar_todas_transacciones_csv(
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Exporta todas las transacciones del sistema (o de la empresa del admin) a CSV.
+    Solo accesible para administradores.
+    """
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    # Decide si quieres todas las transacciones o solo las de la empresa del admin
+    # Opción 1: Todas (para backup completo)
+    transacciones = db.query(models.Transaccion).all()
+    # Opción 2: Solo las de tu empresa (si prefieres)
+    # transacciones = db.query(models.Transaccion).filter(models.Transaccion.empresa_id == current_user.empresa_id).all()
+
+    # Crear buffer en memoria
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+
+    # Escribir cabeceras (incluye usuario_id y empresa_id)
+    writer.writerow([
+        "id", "usuario_id", "empresa_id", "fecha", "numero_transaccion", "monto", "moneda",
+        "beneficiario", "ordenante", "banco", "tipo", "estado", "descripcion",
+        "etiquetas", "fecha_procesamiento", "fecha_confirmacion"
+    ])
+
+    # Escribir cada transacción
+    for t in transacciones:
+        writer.writerow([
+            t.id, t.usuario_id, t.empresa_id, t.fecha, t.numero_transaccion, t.monto, t.moneda,
+            t.beneficiario, t.ordenante, t.banco, t.tipo, t.estado, t.descripcion,
+            t.etiquetas, t.fecha_procesamiento.isoformat() if t.fecha_procesamiento else "",
+            t.fecha_confirmacion.isoformat() if t.fecha_confirmacion else ""
+        ])
+
+    # Preparar respuesta como descarga
+    output.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"backup_transacciones_{timestamp}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 
 
 if __name__ == "__main__":
