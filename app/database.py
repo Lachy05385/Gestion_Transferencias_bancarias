@@ -1,28 +1,29 @@
+
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
+import logging
 
-# SQLite database
-SQLALCHEMY_DATABASE_URL = "sqlite:///./banco.db"
-#SQLALCHEMY_DATABASE_URL = "sqlite:///./data/bancaria.db"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Crea la carpeta si no existe
-os.makedirs(os.path.dirname(SQLALCHEMY_DATABASE_URL.replace("sqlite:///", "")), exist_ok=True)
+# Ruta donde se guardará la BD (dentro de la carpeta data)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)  # crea la carpeta si no existe
 
-# Crea el engine
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}  # necesario para SQLite
-)
+DB_PATH = os.path.join(DATA_DIR, "bancaria.db")
+logger.info(f"Base de datos en: {DB_PATH}")
 
-
-
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False}  # solo necesario para SQLite
 )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
 def create_tables():
@@ -37,3 +38,4 @@ def get_db():
         yield db
     finally:
         db.close()
+        

@@ -25,11 +25,11 @@ from fastapi import APIRouter, Request
 from app.models import EstadoTransaccion
 from app.auth import get_password_hash
 from app.auth import verify_password
-
+from crear_admin import crear_empresa_y_admin
 
 # Crear tablas
 create_tables()
-
+crear_empresa_y_admin()
 app = FastAPI(
     title="API de Gestión Bancaria",
     description="API para procesar y gestionar transacciones bancarias con usuarios",
