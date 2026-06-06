@@ -2027,7 +2027,7 @@ import shutil
 import os
 
 
-@app.get("/admin/backup-db")
+'''@app.get("/admin/backup-db")
 def backup_database(current_user: models.Usuario = Depends(auth.get_current_active_user)):
     if current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -2035,12 +2035,83 @@ def backup_database(current_user: models.Usuario = Depends(auth.get_current_acti
     backup_path = f"/tmp/{backup_filename}"
     try:
         # Copia el archivo de la base de datos desde el volumen a una ubicación temporal
-        shutil.copy2("/data/banco.db",backup_path)
+        shutil.copy2("./bancaria.db",backup_path)
         return FileResponse(backup_path, media_type='application/octet-stream', filename=backup_filename)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al crear el respaldo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al crear el respaldo: {str(e)}")'''
 
+@app.get("/admin/backup-db")
+def backup_database(current_user: models.Usuario = Depends(auth.get_current_active_user)):
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403)
+    db_path = "./data/bancaria.db"
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404)
+    with open(db_path, "rb") as f:
+        data = f.read()
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename=backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"}
+    )
+    
+from fastapi import UploadFile, File, HTTPException
+import os
+import shutil
 
+# Ruta actual de la base de datos (la misma que usas en database.py)
+DB_PATH = "data/bancaria.db"  # o "data/bancaria.db"
+
+@app.post("/admin/restaurar-db")
+async def restaurar_desde_db(
+    archivo: UploadFile = File(...),
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db_session: Session = Depends(get_db)  # inyectamos sesión (no la usaremos, pero forzamos dependencia)
+):
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    # Guardar el archivo subido temporalmente
+    temp_path = f"/tmp/{archivo.filename}"
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(archivo.file, buffer)
+    
+    # Verificar que es una base de datos SQLite válida (leer los primeros bytes)
+    with open(temp_path, "rb") as f:
+        header = f.read(16)
+        if not header.startswith(b'SQLite format 3'):
+            os.remove(temp_path)
+            raise HTTPException(status_code=400, detail="El archivo no es una base de datos SQLite válida")
+    
+    # Cerrar todas las conexiones actuales (forzar dispose del engine)
+    from app.database import engine
+    engine.dispose()  # libera conexiones
+    
+    # Respaldar la BD actual por si acaso
+    backup_actual = f"{DB_PATH}.backup"
+    if os.path.exists(DB_PATH):
+        shutil.copy2(DB_PATH, backup_actual)
+    
+    # Reemplazar el archivo
+    shutil.copy2(temp_path, DB_PATH)
+    os.remove(temp_path)
+    
+    # Intentar reconectar (la próxima petición recreará el engine, pero podemos forzar)
+    from sqlalchemy import create_engine
+    from app.database import engine as old_engine
+    # Reasignar el engine en el módulo database (esto es delicado; mejor reiniciar la app)
+    # Lo más seguro es notificar que se debe reiniciar la aplicación.
+    # Por simplicidad, haremos un nuevo engine y lo asignamos globalmente (con todos los riesgos)
+    try:
+        from app.database import engine, SessionLocal
+        globals()['engine'] = create_engine(engine.url)
+        # Forzar recreación de tablas si es necesario (solo si cambia el esquema, no es el caso)
+    except:
+        pass
+    
+    return {"mensaje": "Base de datos restaurada. Es recomendable reiniciar la aplicación para evitar inconsistencias."}
+    
+    
 # EXPORTAR A CSV
 import csv
 from fastapi.responses import StreamingResponse
