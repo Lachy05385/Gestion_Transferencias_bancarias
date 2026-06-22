@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>Control de Transferencias | ContaFlow</title>
-  <!-- Font Awesome 6 (gratuito) -->
+  <!-- Font Awesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <!-- Google Fonts: Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700&display=swap" rel="stylesheet">
@@ -29,7 +29,6 @@
       padding: 0 24px;
     }
 
-    /* Header y navegación */
     header {
       background: white;
       box-shadow: 0 4px 12px rgba(0,0,0,0.03);
@@ -68,6 +67,7 @@
       display: flex;
       gap: 28px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .nav-links a {
@@ -88,6 +88,8 @@
       color: #1b8c5e;
       background: transparent;
       font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
     }
 
     .btn-outline:hover {
@@ -124,7 +126,6 @@
       cursor: pointer;
     }
 
-    /* Hero */
     .hero {
       padding: 60px 0 40px;
       background: linear-gradient(145deg, #ffffff 0%, #f0f6fa 100%);
@@ -181,7 +182,6 @@
       color: #2c7da0;
     }
 
-    /* secciones generales */
     section {
       padding: 64px 0;
     }
@@ -228,7 +228,6 @@
       margin-bottom: 12px;
     }
 
-    /* módulo de confirmación especial */
     .confirmation-module {
       background: #e9f3ef;
       border-radius: 48px;
@@ -279,7 +278,6 @@
       border-left: 5px solid #1b8c5e;
     }
 
-    /* precios */
     .pricing-grid {
       display: flex;
       flex-wrap: wrap;
@@ -329,11 +327,12 @@
       width: 22px;
     }
 
-    /* formulario */
     .form-section {
       background: #ffffffd9;
       border-radius: 48px;
       box-shadow: 0 20px 30px -10px rgba(0,0,0,0.05);
+      padding: 32px 28px;
+      margin-bottom: 40px;
     }
 
     .form-grid {
@@ -421,7 +420,7 @@
         <a href="#confirmacion">Confirmación</a>
         <a href="#precios">Precios</a>
         <a href="#contrato">Contrato</a>
-        <a href="#" class="btn-outline" id="appLink">Ir a la App <i class="fas fa-arrow-right"></i></a>
+        <button class="btn-outline" id="goToAppBtn">Ir a la App <i class="fas fa-arrow-right"></i></button>
       </div>
     </div>
   </div>
@@ -436,7 +435,7 @@
         <p>Captura y procesa automáticamente los textos de cada transferencia. Módulo de confirmación en tiempo real + cuadre con estado de cuenta. Trabaja 70% más rápido.</p>
         <div class="hero-actions">
           <button class="btn-primary" onclick="scrollToForm()">Solicitar contrato <i class="fas fa-file-signature"></i></button>
-          <a href="#democonfirm" style="text-decoration: none;"><button class="btn-secondary">Ver demo de confirmación</button></a>
+          <button class="btn-secondary" id="demoConfirmBtn">Ver demo de confirmación</button>
         </div>
       </div>
       <div class="hero-img">
@@ -498,7 +497,7 @@
   <div class="container" id="precios">
     <h2 class="section-title">💰 Planes pensados para contadores</h2>
     <div class="pricing-grid">
-      <div class="price-card">
+      <div class="price-card" data-plan="Básico">
         <h3>Básico</h3>
         <div class="price">$39 <span>/mes</span></div>
         <ul>
@@ -507,9 +506,9 @@
           <li><i class="fas fa-check-circle"></i> Módulo de confirmación (manual)</li>
           <li><i class="fas fa-envelope"></i> Soporte email</li>
         </ul>
-        <button class="btn-outline" onclick="scrollToForm()">Elegir plan</button>
+        <button class="btn-outline select-plan-btn">Elegir plan</button>
       </div>
-      <div class="price-card featured">
+      <div class="price-card featured" data-plan="Premium">
         <h3>Premium <i class="fas fa-crown" style="color: #f4b942;"></i></h3>
         <div class="price">$89 <span>/mes</span></div>
         <ul>
@@ -518,9 +517,9 @@
           <li><i class="fas fa-check-circle"></i> Confirmación automática vs EE.CC reales</li>
           <li><i class="fas fa-headset"></i> Soporte prioritario + integración contable</li>
         </ul>
-        <button class="btn-primary" onclick="scrollToForm()">Contratar ahora</button>
+        <button class="btn-primary select-plan-btn">Contratar ahora</button>
       </div>
-      <div class="price-card">
+      <div class="price-card" data-plan="Empresarial">
         <h3>Empresarial</h3>
         <div class="price">Personalizado</div>
         <ul>
@@ -529,14 +528,14 @@
           <li><i class="fas fa-chart-pie"></i> Dashboard analítico</li>
           <li><i class="fas fa-concierge-bell"></i> Implementación dedicada</li>
         </ul>
-        <button class="btn-outline" onclick="scrollToForm()">Contactar ventas</button>
+        <button class="btn-outline select-plan-btn">Contactar ventas</button>
       </div>
     </div>
   </div>
 
-  <!-- Formulario para solicitar contratos -->
+  <!-- Formulario para solicitar contratos (ajustado al endpoint) -->
   <div class="container" id="contrato">
-    <div class="form-section" style="padding: 32px 28px; background: #ffffff; margin-bottom: 40px;">
+    <div class="form-section">
       <div class="form-grid">
         <div class="form-info">
           <i class="fas fa-file-contract" style="font-size: 3rem; color:#1b8c5e;"></i>
@@ -552,20 +551,22 @@
           <h3>📄 Solicitar contrato</h3>
           <form id="contractForm">
             <div class="form-group">
-              <input type="text" placeholder="Nombre completo *" required id="fullName">
+              <input type="text" id="nombre" placeholder="Nombre completo *" required>
             </div>
             <div class="form-group">
-              <input type="email" placeholder="Correo electrónico *" required id="email">
+              <input type="email" id="email" placeholder="Correo electrónico *" required>
             </div>
             <div class="form-group">
-              <input type="tel" placeholder="Teléfono / WhatsApp" id="phone">
+              <input type="tel" id="telefono" placeholder="Teléfono / WhatsApp">
             </div>
             <div class="form-group">
-              <input type="text" placeholder="Nombre del despacho / empresa" id="company">
+              <input type="text" id="empresa" placeholder="Nombre del despacho / empresa">
             </div>
             <div class="form-group">
-              <textarea rows="3" placeholder="Cuéntanos tu volumen de transferencias mensual o necesidades específicas..."></textarea>
+              <textarea id="mensaje" rows="3" placeholder="Cuéntanos tu volumen de transferencias mensual o necesidades específicas..."></textarea>
             </div>
+            <!-- Campo oculto para el plan seleccionado -->
+            <input type="hidden" id="planSeleccionado" value="">
             <button type="submit" class="btn-primary" style="width: 100%;">Enviar solicitud <i class="fas fa-paper-plane"></i></button>
             <p style="font-size: 0.75rem; margin-top: 16px;">Al enviar aceptas recibir información comercial y condiciones del servicio.</p>
           </form>
@@ -586,7 +587,7 @@
         <a href="#">Inicio</a>
         <a href="#servicio">Servicio</a>
         <a href="#precios">Precios</a>
-        <a href="#" id="mainAppFooterLink">Acceso App principal</a>
+        <button id="footerAppBtn" class="btn-outline" style="background: none; border-color: #bdd9e5; color: #bdd9e5;">Acceso App principal</button>
       </div>
     </div>
     <hr>
@@ -595,13 +596,13 @@
 </footer>
 
 <script>
-  // Módulo demo de confirmación (simula si la transferencia ya está en estado de cuenta)
+  // --- Lógica del módulo de confirmación (demo) ---
+  const BASE_URL = window.origin
   const checkBtn = document.getElementById('checkBtn');
   const transRefInput = document.getElementById('transRef');
   const demoResult = document.getElementById('demoResult');
 
   function simulateConfirmation(referenceText) {
-    // Simulamos base de datos de movimientos que ya aparecieron en estado de cuenta
     const confirmedKeywords = ['72.500', '9876', 'PAGO NOMINA', 'TRANSFERENCIA APROBADA', 'CARGOMEX', 'RUIZ'];
     let lowerRef = referenceText.toLowerCase();
     let found = confirmedKeywords.some(keyword => lowerRef.includes(keyword.toLowerCase()));
@@ -622,44 +623,91 @@
     demoResult.innerHTML = `<i class="fas fa-${result.status === 'confirmed' ? 'check-circle' : 'hourglass-half'}"></i> ${result.message}`;
   });
 
-  // Formulario de solicitud de contrato
-  const form = document.getElementById('contractForm');
-  const msgDiv = document.getElementById('formMsg');
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = document.getElementById('fullName').value.trim();
-    const email = document.getElementById('email').value.trim();
-    if (!name || !email) {
-      msgDiv.innerHTML = '<span style="color:#c0392b;">Por favor completa nombre y correo.</span>';
-      return;
-    }
-    msgDiv.innerHTML = '<span style="color:#1b8c5e;"><i class="fas fa-check"></i> ¡Solicitud enviada! En breve recibirás el contrato y condiciones en tu correo.</span>';
-    form.reset();
-    setTimeout(() => { msgDiv.innerHTML = ''; }, 5000);
+  // --- Capturar plan seleccionado desde las tarjetas de precios ---
+  const planHidden = document.getElementById('planSeleccionado');
+  const planBtns = document.querySelectorAll('.select-plan-btn');
+  planBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const priceCard = btn.closest('.price-card');
+      const plan = priceCard.getAttribute('data-plan');
+      planHidden.value = plan;
+      // Desplazar suavemente al formulario
+      document.getElementById('contrato').scrollIntoView({ behavior: 'smooth' });
+      // Opcional: mostrar un pequeño mensaje en el formulario
+      const msgDiv = document.getElementById('formMsg');
+      msgDiv.innerHTML = `<span style="color:#1b8c5e;">✨ Has seleccionado el plan <strong>${plan}</strong>. Completa tus datos.</span>`;
+      setTimeout(() => {
+        if (msgDiv.innerHTML.includes('seleccionado')) msgDiv.innerHTML = '';
+      }, 4000);
+    });
   });
 
-  // Funciones de scroll
+  // --- Envío del formulario al endpoint /api/contrato ---
+  const contractForm = document.getElementById('contractForm');
+  const formMsg = document.getElementById('formMsg');
+
+  contractForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    // Capturar valores
+    const nombre = document.getElementById('nombre').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const telefono = document.getElementById('telefono').value.trim();
+    const empresa = document.getElementById('empresa').value.trim();
+    const mensaje = document.getElementById('mensaje').value.trim();
+    const plan = planHidden.value;
+
+    if (!nombre || !email) {
+      formMsg.innerHTML = '<span style="color:#c0392b;">❌ Por favor completa nombre y correo electrónico.</span>';
+      return;
+    }
+
+    // Construir objeto según lo que espera el endpoint
+    const payload = {
+      nombre: nombre,
+      email: email,
+      telefono: telefono || null,
+      empresa: empresa || null,
+      mensaje: mensaje || null,
+      plan: plan || null
+    };
+
+    try {
+      const response = await fetch('/api/contrato', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (response.ok) {
+        formMsg.innerHTML = '<span style="color:#1b8c5e;">✅ ¡Solicitud enviada exitosamente! Te contactaremos pronto.</span>';
+        contractForm.reset();
+        planHidden.value = '';  // resetear plan
+      } else {
+        throw new Error(result.message || 'Error en el servidor');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      formMsg.innerHTML = '<span style="color:#c0392b;">❌ Error al enviar la solicitud. Intenta de nuevo más tarde.</span>';
+    }
+  });
+
+  // --- Redirección a la app principal (localhost:8000/test) ---
+  function redirectToApp() {
+    window.location.href = 'http://localhost:8000/test';
+  }
+  const goToAppBtn = document.getElementById('goToAppBtn');
+  const footerAppBtn = document.getElementById('footerAppBtn');
+  if (goToAppBtn) goToAppBtn.addEventListener('click', redirectToApp);
+  if (footerAppBtn) footerAppBtn.addEventListener('click', redirectToApp);
+
+  // --- Funciones auxiliares de scroll ---
   window.scrollToForm = function() {
     document.getElementById('contrato').scrollIntoView({ behavior: 'smooth' });
   };
-
-  // Enlaces hacia la app principal (simulado con alert)
-  const appLinks = document.querySelectorAll('#appLink, #mainAppFooterLink');
-  appLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      alert("🔗 Redirigiendo a la aplicación principal de ContaFlow (demo: dashboard de conciliación). En producción este enlace llevaría a tu app.");
-      // window.location.href = "https://tuapp.com/inicio"; // Reemplazar por URL real
-    });
+  document.getElementById('demoConfirmBtn')?.addEventListener('click', () => {
+    document.getElementById('democonfirm').scrollIntoView({ behavior: 'smooth' });
   });
-
-  // Scroll suave a módulo confirmación desde hero
-  const demoBtn = document.querySelector('.btn-secondary');
-  if (demoBtn) {
-    demoBtn.addEventListener('click', () => {
-      document.getElementById('democonfirm').scrollIntoView({ behavior: 'smooth' });
-    });
-  }
 </script>
 </body>
 </html>

@@ -898,6 +898,20 @@ def obtener_ip_publica():
         return response.text
     except Exception:
         return "No disponible"
+    
+
+#limpiar datos en restauracion CSV
+def parse_csv_value(valor, tipo):
+    if valor == '' or valor is None:
+        return None if tipo in ['datetime'] else (0 if tipo in ['int','float'] else '')
+    if tipo == 'int':
+        return int(valor)
+    if tipo == 'float':
+        return float(valor)
+    if tipo == 'datetime':
+        return datetime.fromisoformat(valor)
+    return valor
+    
 
 def get_server_url(port=8000):
     """

@@ -241,6 +241,17 @@ class TransaccionResponse(TransaccionBase):
         # Si ya es lista, devolverla
         return v or []
     
+    
+    
+class ContratoRequest(BaseModel):
+    nombre: str
+    email: EmailStr
+    telefono: Optional[str] = None
+    empresa: Optional[str] = None
+    mensaje: Optional[str] = None
+    plan: Optional[str] = None   # "Básico", "Premium", "Empresarial"
+
+    
     model_config = ConfigDict(from_attributes=True)
     
 

@@ -1,15 +1,34 @@
-# crear_admin.py
-# crear_admin.py (ubicado en la raíz del proyecto: d:\projectoBanc)
+import os
 from app.auth import get_password_hash
 from app.database import SessionLocal
 from app import models
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Obtiene la carpeta donde está este archivo (crear_admin.py)
+BASE_DIR = Path(__file__).resolve().parent
+ENV_PATH = BASE_DIR / ".env"
+
+load_dotenv(dotenv_path=ENV_PATH)
+print("Ruta de .env ")
+print(ENV_PATH)
+#
+
+# Leer variables de entorno (con valores por defecto si no existen)
+USER_ADMIN = os.getenv("USER_ADMIN", "admin@contaflow.com")
+AD_PASSWORD = os.getenv("AD_PASSWORD", "Admin123!")
+print("="*50)
+print("USER -> ", USER_ADMIN,"PASSWORD -> ",AD_PASSWORD )
+print("="*50)
+# 
+# #
+
 
 def crear_empresa_y_admin():
     db = SessionLocal()
     
     try:
-        # 1. Buscar o crear la empresa principal
-        # Opción 1: Buscar por un NIT específico (por ejemplo, "NIT_PRINCIPAL")
+        
         nit_principal = "900000001"  # Cambia por el NIT real que quieras usar
         empresa = db.query(models.Empresa).filter(models.Empresa.nit == nit_principal).first()
         
@@ -38,10 +57,10 @@ def crear_empresa_y_admin():
         
         if not admin:
             admin = models.Usuario(
-                email="admin@contaflow.com",
+                email=USER_ADMIN,
                 nombre="admin",
                 apellido="Sistema",
-                hashed_password=get_password_hash("Admin123!"),
+                hashed_password=get_password_hash(AD_PASSWORD),
                 esta_activo=True,
                 rol="admin",
                 empresa_id=empresa.id

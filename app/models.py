@@ -32,14 +32,7 @@ class EstadoTransaccion(str, enum.Enum):
     CONFIRMADA = "confirmada"
     RECHAZADA = "rechazada"
     
-# creando entidad     
-class Entidad(Base):
-    __tablename__ = "entidad"
-    id = Column(Integer, primary_key=True,index=True)
-    name = Column(String, nullable=False,unique=True)
-    
-    
-    pass
+
 #usuario
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -125,6 +118,32 @@ class Opinion(Base):
     
     # Relación
     usuario = relationship("Usuario", back_populates="opiniones")
+    
+    
+    
+class StatusSolicitud(str, enum.Enum):
+    PENDING = "pending"
+    CONTACTED = "contacted"
+    CONVERTED = "converted"
+
+class ContractRequest(Base):
+    __tablename__ = "contract_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, nullable=False)
+    email = Column(String, nullable=False, index=True)   # índice para búsquedas rápidas
+    phone = Column(String, nullable=True)
+    company = Column(String, nullable=True)
+    message = Column(String, nullable=True)   # TEXT en SQLite
+    plan = Column(String, nullable=True)      # "Básico", "Premium", "Empresarial"
+    status = Column(Enum(StatusSolicitud), default=StatusSolicitud.PENDING)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    
+    # (Opcional) Si luego quieres relacionar con un usuario o empresa cuando se convierta
+    # usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    # empresa_id = Column(Integer, ForeignKey("empresas.id"), nullable=True)
+
 
 # Crear las tablas
 def create_tables():

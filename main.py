@@ -7,8 +7,8 @@ from sqlalchemy.orm import subqueryload    # Otra alternativa
 from sqlalchemy.orm import lazyload        # Para carga perezosa (default)
 from sqlalchemy.orm import contains_eager
 import re
-
-
+from app.routers.contratos import ContractRequest
+from app.schemas import ContratoRequest
 
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -17,8 +17,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Depends, HTTPException, status, Form
 from app import crud, models, auth, schemas, utils
 from app.database import engine, get_db, create_tables
-from pydantic import Field  # ← ESTA ES LA IMPORTACIÓN QUE FALTA
-from fastapi import Query  # Importa Query directamente
+from pydantic import Field
+from fastapi import Query 
 from datetime import timedelta
 from fastapi.responses import HTMLResponse
 from fastapi import APIRouter, Request
@@ -26,6 +26,8 @@ from app.models import EstadoTransaccion
 from app.auth import get_password_hash
 from app.auth import verify_password
 from crear_admin import crear_empresa_y_admin
+from app.routers import contratos 
+
 
 # Crear tablas
 create_tables()
@@ -45,8 +47,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Endpoints públicos
-# main.py - Endpoints para 
+
+app.include_router(contratos.router)
+
+
+#router = APIRouter(prefix="/admin", tags=["Administración"])
+
+#publicos 
 
 @app.get("/landing", response_class=HTMLResponse)
 async def landing_page(request: Request):
@@ -106,7 +113,7 @@ def listar_transacciones_empresa(
     estado: Optional[str] = None,
     fecha_inicio: Optional[str] = None,
     fecha_fin: Optional[str] = None,
-    empresa_id: Optional[int] = None,  # 👈 AGREGAR ESTE PARÁMETRO
+    empresa_id: Optional[int] = None, 
     skip: int = 0,
     limit: int = 100,
     current_user: models.Usuario = Depends(auth.get_current_active_user),
@@ -125,7 +132,7 @@ def listar_transacciones_empresa(
         )
     
     print(f"🔍 Usuario: {current_user.email} (rol: {current_user.rol}, empresa_id: {current_user.empresa_id})")
-    print(f"🔍 Parámetros - usuario_id: {usuario_id}, empresa_id: {empresa_id}")
+    print(f"🔍 Parámetros - usuario_id: {current_user.id}, empresa_id: {current_user.empresa_id}")
     
     # Construir consulta
     query = db.query(models.Transaccion).options(joinedload(models.Transaccion.usuario))
@@ -190,7 +197,7 @@ def listar_usuarios_empresa(
     return usuarios
 
 #usuarios
-@app.get("/admin/usuarios", response_model=List[schemas.UserResponse])
+'''@app.get("/admin/usuarios", response_model=List[schemas.UserResponse])
 def listar_usuarios(
     empresa_id: Optional[int] = None,
     skip: int = 0,
@@ -216,7 +223,7 @@ def listar_usuarios(
     # Ordenar y paginar
     usuarios = query.order_by(models.Usuario.id).offset(skip).limit(limit).all()
     
-    return usuarios
+    return usuarios'''
 
 
 @app.post("/registro", response_model=schemas.UserResponse)
@@ -557,7 +564,7 @@ def actualizar_transaccion(
 
 
 # Mantén también tu endpoint JSON original si lo necesitas
-@app.post("/token/json", response_model=schemas.Token)
+'''@app.post("/token/json", response_model=schemas.Token)
 def login_json(
     login_data: schemas.UserLogin,
     db: Session = Depends(get_db)
@@ -576,7 +583,7 @@ def login_json(
     )
     print(access_token)
     return {"access_token": access_token, "token_type": "bearer"}
-
+'''
 @app.post("/procesar-texto")
 def procesar_texto_transaccion(texto: str,
     db: Session = Depends(get_db)
@@ -1120,6 +1127,8 @@ async def crear_transaccion_desde_imagen(
     tipo: str = Form(...),
     descripcion: Optional[str] = Form(None),
     token: str = Form(...),
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    
     db: Session = Depends(get_db)
 ):
     """
@@ -1362,7 +1371,7 @@ def transacciones_por_mes(
 
 
 # prueba para debuguear
-@app.post("/transacciones/recibir", response_model=schemas.TransaccionResponse)
+'''@app.post("/transacciones/recibir", response_model=schemas.TransaccionResponse)
 async def recibir_transaccion_debug(
     texto: str = Form(...),
     tipo: schemas.TipoTransaccion = Form(...),
@@ -1414,7 +1423,7 @@ async def recibir_transaccion_debug(
     
     # Continuar con la creación de la transacción...
     return {"mensaje": "Debug completado", "usuario": user.email}
-
+'''
 
 # routers
 
@@ -2062,55 +2071,82 @@ import shutil
 # Ruta actual de la base de datos (la misma que usas en database.py)
 DB_PATH = "data/bancaria.db"  # o "data/bancaria.db"
 
+import shutil
+import tempfile
+import os
+from fastapi import UploadFile, File, HTTPException, Depends
+#from app.database import engine, DB_PATH  # Asegúrate de importar DB_PATH de database.py
+from app.database import __all__
+
+
 @app.post("/admin/restaurar-db")
 async def restaurar_desde_db(
     archivo: UploadFile = File(...),
     current_user: models.Usuario = Depends(auth.get_current_active_user),
-    db_session: Session = Depends(get_db)  # inyectamos sesión (no la usaremos, pero forzamos dependencia)
+    db_session: Session = Depends(get_db)  # solo para forzar autenticación
 ):
     if current_user.rol != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
-    
-    # Guardar el archivo subido temporalmente
-    temp_path = f"/tmp/{archivo.filename}"
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(archivo.file, buffer)
-    
-    # Verificar que es una base de datos SQLite válida (leer los primeros bytes)
-    with open(temp_path, "rb") as f:
-        header = f.read(16)
-        if not header.startswith(b'SQLite format 3'):
-            os.remove(temp_path)
-            raise HTTPException(status_code=400, detail="El archivo no es una base de datos SQLite válida")
-    
-    # Cerrar todas las conexiones actuales (forzar dispose del engine)
-    from app.database import engine
-    engine.dispose()  # libera conexiones
-    
-    # Respaldar la BD actual por si acaso
-    backup_actual = f"{DB_PATH}.backup"
-    if os.path.exists(DB_PATH):
-        shutil.copy2(DB_PATH, backup_actual)
-    
-    # Reemplazar el archivo
-    shutil.copy2(temp_path, DB_PATH)
-    os.remove(temp_path)
-    
-    # Intentar reconectar (la próxima petición recreará el engine, pero podemos forzar)
-    from sqlalchemy import create_engine
-    from app.database import engine as old_engine
-    # Reasignar el engine en el módulo database (esto es delicado; mejor reiniciar la app)
-    # Lo más seguro es notificar que se debe reiniciar la aplicación.
-    # Por simplicidad, haremos un nuevo engine y lo asignamos globalmente (con todos los riesgos)
+
+    # Verificar extensión
+    if not archivo.filename.endswith('.db'):
+        raise HTTPException(status_code=400, detail="El archivo debe tener extensión .db")
+
+    # Crear un archivo temporal de forma segura (en el directorio temp del sistema)
     try:
-        from app.database import engine, SessionLocal
-        globals()['engine'] = create_engine(engine.url)
-        # Forzar recreación de tablas si es necesario (solo si cambia el esquema, no es el caso)
-    except:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp_file:
+            temp_path = tmp_file.name
+            # Copiar el contenido del archivo subido al temporal
+            shutil.copyfileobj(archivo.file, tmp_file)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar el archivo temporal: {str(e)}")
+
+    # Verificar que es una base de datos SQLite válida
+    try:
+        with open(temp_path, "rb") as f:
+            header = f.read(16)
+            if not header.startswith(b'SQLite format 3'):
+                os.unlink(temp_path)
+                raise HTTPException(status_code=400, detail="El archivo no es una base de datos SQLite válida")
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise HTTPException(status_code=400, detail=f"Error al validar el archivo: {str(e)}")
+
+    # Ruta actual de la BD (debes exportarla desde database.py)
+    # DB_PATH = os.path.join(DATA_DIR, "bancaria.db")  # o la que tengas definida
+    if not os.path.exists(DB_PATH):
+        # Si la BD original no existe, la crearemos más tarde
         pass
-    
-    return {"mensaje": "Base de datos restaurada. Es recomendable reiniciar la aplicación para evitar inconsistencias."}
-    
+
+    # Hacer un respaldo de la BD actual por si acaso (opcional)
+    backup_path = f"{DB_PATH}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    if os.path.exists(DB_PATH):
+        shutil.copy2(DB_PATH, backup_path)
+        print(f"Respaldo de BD actual guardado en {backup_path}")
+
+    # Cerrar todas las conexiones actuales (importante)
+    from app.database import engine as current_engine
+    current_engine.dispose()  # libera conexiones, la próxima petición recreará el engine
+
+    # Reemplazar el archivo de la BD
+    try:
+        shutil.move(temp_path, DB_PATH)  # mover (sobrescribe)
+    except Exception as e:
+        # Si falla, intentamos copiar
+        try:
+            shutil.copy2(temp_path, DB_PATH)
+        except Exception as e2:
+            raise HTTPException(status_code=500, detail=f"Error al escribir la nueva base de datos: {str(e2)}")
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    # Notificar éxito, pero advertir que es recomendable reiniciar la app
+    return {
+        "mensaje": "Base de datos restaurada correctamente. Se recomienda reiniciar la aplicación para evitar inconsistencias.",
+        "backup_anterior": backup_path if os.path.exists(backup_path) else None
+    } 
     
 # EXPORTAR A CSV
 import csv
@@ -2167,7 +2203,137 @@ def exportar_todas_transacciones_csv(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+import csv
+import io
+from fastapi import UploadFile, File, HTTPException, Depends, Form
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app import models
+from app.auth import get_current_active_user
+from typing import Optional
+from datetime import datetime
+import logging
 
+logger = logging.getLogger(__name__)
+
+@app.post("/admin/restaurar-csv")
+async def restaurar_desde_csv(
+    archivo: UploadFile = File(..., description="Archivo CSV exportado previamente"),
+    modo: str = Form("merge", description="Modo: 'merge' (actualiza si existe), 'insert' (solo inserta nuevos, ignora duplicados), 'replace' (borra todo y reinserta)"),
+    confirmar: str = Form("NO", description="Para modo 'replace', enviar 'SI'"),
+    current_user: models.Usuario = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Restaura transacciones desde un archivo CSV.
+    - merge: Si la transacción ya existe (por id), la actualiza; si no, la inserta.
+    - insert: Solo inserta transacciones nuevas (ignora las que ya existen, evita duplicados).
+    - replace: ELIMINA TODAS las transacciones existentes y luego inserta las del CSV (¡peligroso!). Requiere confirmar='SI'.
+    """
+    # Solo administradores
+    if current_user.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
+
+    # Validar extensión
+    if not archivo.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="El archivo debe ser CSV")
+
+    # Leer el contenido del archivo (en memoria)
+    content = await archivo.read()
+    try:
+        decoded = content.decode('utf-8')
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="El archivo no está codificado en UTF-8")
+
+    # Usar csv.DictReader
+    reader = csv.DictReader(io.StringIO(decoded))
+    # Verificar que tenga las columnas esperadas (al menos algunas)
+    expected_columns = ['id', 'usuario_id', 'empresa_id', 'fecha', 'numero_transaccion', 'monto', 'moneda',
+                        'beneficiario', 'ordenante', 'banco', 'tipo', 'estado', 'descripcion', 'etiquetas']
+    if not all(col in reader.fieldnames for col in expected_columns[:5]):  # comprobación básica
+        raise HTTPException(status_code=400, detail="El CSV no tiene el formato esperado (faltan columnas)")
+
+    # Modo replace: requiere confirmación explícita
+    if modo == "replace":
+        if confirmar != "SI":
+            raise HTTPException(status_code=400, detail="Para el modo 'replace' debes enviar confirmar='SI'")
+        db.query(models.Transaccion).delete()
+        db.commit()
+        logger.warning("Todas las transacciones fueron eliminadas por el administrador antes de restaurar CSV")
+
+    # Estadísticas
+    total_filas = 0
+    insertadas = 0
+    actualizadas = 0
+    errores = []
+
+    # Procesar cada fila
+    for row in reader:
+        total_filas += 1
+        try:
+            # Extraer ID
+            id_str = row.get('id', '').strip()
+            if not id_str:
+                raise ValueError("ID de transacción no puede estar vacío")
+            id_trans = int(id_str)
+
+            # Buscar si ya existe
+            existente = db.query(models.Transaccion).filter(models.Transaccion.id == id_trans).first()
+
+            if modo == "insert" and existente:
+                # En modo insert, saltamos duplicados
+                continue
+
+            # Preparar datos con conversión de tipos
+            data = {
+                'id': id_trans,
+                'usuario_id': int(row['usuario_id']),
+                'empresa_id': int(row['empresa_id']),
+                'fecha': row['fecha'],
+                'numero_transaccion': row['numero_transaccion'],
+                'monto': float(row['monto']),
+                'moneda': row['moneda'],
+                'beneficiario': row['beneficiario'],
+                'ordenante': row['ordenante'],
+                'banco': row['banco'],
+                'tipo': row['tipo'],
+                'estado': row['estado'],
+                'descripcion': row.get('descripcion', ''),
+                'etiquetas': row.get('etiquetas', '[]'),
+            }
+            # Fechas: pueden estar vacías
+            fecha_proc = row.get('fecha_procesamiento', '')
+            data['fecha_procesamiento'] = datetime.fromisoformat(fecha_proc) if fecha_proc else None
+            fecha_conf = row.get('fecha_confirmacion', '')
+            data['fecha_confirmacion'] = datetime.fromisoformat(fecha_conf) if fecha_conf else None
+
+            if existente and modo in ["merge", "replace"]:
+                # Actualizar existente (excepto id)
+                for key, value in data.items():
+                    if key != 'id':
+                        setattr(existente, key, value)
+                actualizadas += 1
+            elif not existente:
+                # Insertar nuevo
+                nueva_transaccion = models.Transaccion(**data)
+                db.add(nueva_transaccion)
+                insertadas += 1
+            # Si modo 'insert' y existe, ya se saltó
+
+        except Exception as e:
+            errores.append(f"Fila {total_filas}: {str(e)}")
+            continue
+
+    # Commit final
+    db.commit()
+
+    return {
+        "mensaje": "Restauración completada",
+        "total_filas_procesadas": total_filas,
+        "insertadas": insertadas,
+        "actualizadas": actualizadas,
+        "errores": errores
+    }
 
 if __name__ == "__main__":
     import os
