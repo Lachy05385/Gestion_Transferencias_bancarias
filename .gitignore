@@ -3,6 +3,8 @@ __pycache__/
 data/
 *.exe
 *.pdf
+*.rar
+banco.db
 
 # Created by https://www.gitignore.io/api/vim,vagrant,linux,eclipse,python,pycharm+all,jupyternotebook,sonarqube
 # Edit at https://www.gitignore.io/?templates=vim,vagrant,linux,eclipse,python,pycharm+all,jupyternotebook,sonarqube
