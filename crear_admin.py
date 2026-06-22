@@ -15,15 +15,13 @@ print(ENV_PATH)
 #
 
 # Leer variables de entorno (con valores por defecto si no existen)
-USER_ADMIN = os.getenv("USER_ADMIN", "admin@contaflow.com")
-AD_PASSWORD = os.getenv("AD_PASSWORD", "Admin123!")
-print("="*50)
-print("USER -> ", USER_ADMIN,"PASSWORD -> ",AD_PASSWORD )
-print("="*50)
-# 
-# #
+USER_ADMIN = os.getenv("USER_ADMIN")
+if not USER_ADMIN:
+    raise ValueError("La variable de entorno USER_ADMIN no está definida")
 
-
+AD_PASSWORD = os.getenv("AD_PASSWORD")
+if not AD_PASSWORD:
+    raise ValueError("La variable de entorno AD_PASSWORD no está definida")
 def crear_empresa_y_admin():
     db = SessionLocal()
     
@@ -78,4 +76,5 @@ def crear_empresa_y_admin():
         db.close()
 
 if __name__ == "__main__":
+    
     crear_empresa_y_admin()
