@@ -8,6 +8,7 @@ data/
 database_t.py
 *.db
 empresa_id_null.py
-procfile.bk
+procfile.bak
 Transferencias modelo/
-
+/procesar_xml/
+*.pyc

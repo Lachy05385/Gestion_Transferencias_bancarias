@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 #from app.routers.admin_usuarios import router
-
+from create_database import create_database
 from sqlalchemy.orm import joinedload      # Para eager loading (cargar relaciones)
 from sqlalchemy.orm import selectinload    # Alternativa a joinedload (mejor para relaciones uno a muchos)
 from sqlalchemy.orm import subqueryload    # Otra alternativa
@@ -2334,6 +2334,11 @@ async def restaurar_desde_csv(
         "actualizadas": actualizadas,
         "errores": errores
     }
+    
+    
+@app.on_event("startup")
+async def startup_event():
+    create_database()
 
 if __name__ == "__main__":
     import os
