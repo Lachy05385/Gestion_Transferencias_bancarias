@@ -12,3 +12,5 @@ procfile.bak
 Transferencias modelo/
 /procesar_xml/
 *.pyc
+*.log
+*.pdf
