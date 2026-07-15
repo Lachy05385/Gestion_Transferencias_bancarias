@@ -2213,6 +2213,7 @@ from app.auth import get_current_active_user
 from typing import Optional
 from datetime import datetime
 import logging
+from sqlalchemy.sql  import text
 
 logger = logging.getLogger(__name__)
 
@@ -2326,6 +2327,27 @@ async def restaurar_desde_csv(
 
     # Commit final
     db.commit()
+
+    # ===== Sincronizar secuenciador de PostgreSQL =====
+    # Solo si estamos usando PostgreSQL (detectar el dialecto)
+    if db.bind.dialect.name == 'postgresql':
+        try:
+            # Obtener el nombre del secuenciador
+            seq_name = db.execute(
+                text("SELECT pg_get_serial_sequence('transacciones', 'id')")
+            ).scalar()
+            if seq_name:
+                # Establecer el valor del secuenciador al máximo ID actual
+                db.execute(
+                    text(f"SELECT setval('{seq_name}', (SELECT COALESCE(max(id), 0) FROM transacciones))")
+                )
+                db.commit()
+                logger.info(f"Secuenciador '{seq_name}' sincronizado correctamente.")
+            else:
+                logger.warning("No se encontró un secuenciador para la tabla 'transacciones'.")
+        except Exception as e:
+            logger.error(f"Error al sincronizar el secuenciador: {e}")
+            # No levantamos una excepción para no interrumpir la respuesta, pero lo registramos.
 
     return {
         "mensaje": "Restauración completada",

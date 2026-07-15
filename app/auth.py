@@ -58,10 +58,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         print(f"🔐 Verificando password...")
         print(f"  Plain: '{plain_password}'")  # Las comillas muestran espacios/caracteres
         print(f"  Hash:  {hashed_password[:50]}...")
-        
+
         # Asegurar que la contraseña sea string y esté limpia
         plain_password = str(plain_password).strip()
-        
         result = pwd_context.verify(plain_password, hashed_password)
         print(f"  Resultado: {result}")
         return result
