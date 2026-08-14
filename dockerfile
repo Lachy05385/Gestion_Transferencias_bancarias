@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Instalar Tesseract y sus dependencias
+# Instalar Tesseract (esto SÍ funciona en Docker)
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
 # Establecer directorio de trabajo
 WORKDIR /app
 
-# Copiar e instalar dependencias de Python
+# Copiar y instalar dependencias de Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
