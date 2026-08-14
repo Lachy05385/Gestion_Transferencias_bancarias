@@ -873,7 +873,7 @@ def validar_y_normalizar_datos_transferencia(datos: dict) -> dict:
     return datos
 
 import socket
-import requests
+#mport requests
 
 def obtener_server_ip():
     """
