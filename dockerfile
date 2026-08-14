@@ -1,9 +1,10 @@
 FROM python:3.10.9-slim
 
-# Instalar Tesseract
+# Instalar Tesseract y actualizar pip
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip
 
 WORKDIR /app
 
