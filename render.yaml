@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: gestorTrasnsfer  # Cambia esto por el nombre de tu servicio
-    runtime: docker
+    name: mi-api-ocr  # El nombre que quieras
+    runtime: docker   # <--- ESTO es lo que obliga a usar Docker
     plan: free
-    dockerfilePath: ./Dockerfile  # Asegúrate que la ruta sea correcta
+    dockerfilePath: ./Dockerfile
