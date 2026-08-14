@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: gestorTrasnsfer  # Cambia esto por el nombre de tu servicio
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile  # Asegúrate que la ruta sea correcta
