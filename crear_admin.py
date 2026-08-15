@@ -3,43 +3,30 @@ from app.auth import get_password_hash
 from app.database import SessionLocal
 from app import models
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Obtiene la carpeta donde está este archivo (crear_admin.py)
-BASE_DIR = Path(__file__).resolve().parent
-ENV_PATH = BASE_DIR / ".env"
+# Usar credenciales fijas para SQLite (sin .env)
+USER_ADMIN = "admin@contaflow.com"
+AD_PASSWORD = "Admin123!"
 
-load_dotenv(dotenv_path=ENV_PATH)
-print("Ruta de .env ")
-print(ENV_PATH)
-#
-
-# Leer variables de entorno (con valores por defecto si no existen)
-USER_ADMIN = os.getenv("USER_ADMIN", "admin@contaflow.com")
-AD_PASSWORD = os.getenv("AD_PASSWORD", "Admin123!")
-print("="*50)
-print("USER -> ", USER_ADMIN,"PASSWORD -> ",AD_PASSWORD )
-print("="*50)
-# 
-# #
-
+#print("="*50)
+#print("Usuario Admin:", USER_ADMIN)
+#print("Contraseña:", AD_PASSWORD)
+#print("="*50)
 
 def crear_empresa_y_admin():
     db = SessionLocal()
     
     try:
-        
-        nit_principal = "900000001"  # Cambia por el NIT real que quieras usar
+        # 1. Crear empresa principal
+        nit_principal = "900000001"
         empresa = db.query(models.Empresa).filter(models.Empresa.nit == nit_principal).first()
         
         if not empresa:
-            # Si no existe, la creamos con datos por defecto (puedes pedir inputs)
             empresa = models.Empresa(
                 nombre="Empresa Principal ContaFlow",
                 nit=nit_principal,
                 direccion="Calle Principal #123",
                 telefono="555-1234"
-                # fecha_creacion se asigna automáticamente con default=datetime.utcnow
             )
             db.add(empresa)
             db.commit()
@@ -48,17 +35,16 @@ def crear_empresa_y_admin():
         else:
             print(f"📌 Usando empresa existente: {empresa.nombre} (ID: {empresa.id})")
         
-        # 2. Crear usuario administrador asociado a esa empresa
-        # Verificar si ya existe un admin con ese email para esa empresa
+        # 2. Crear usuario administrador
         admin = db.query(models.Usuario).filter(
-            models.Usuario.email == "admin@contaflow.com",
+            models.Usuario.email == USER_ADMIN,
             models.Usuario.empresa_id == empresa.id
         ).first()
         
         if not admin:
             admin = models.Usuario(
                 email=USER_ADMIN,
-                nombre="admin",
+                nombre="Admin",
                 apellido="Sistema",
                 hashed_password=get_password_hash(AD_PASSWORD),
                 esta_activo=True,
@@ -67,7 +53,7 @@ def crear_empresa_y_admin():
             )
             db.add(admin)
             db.commit()
-            print("✅ Usuario admin creado: admin@contaflow.com / Admin123!")
+            print("✅ Usuario admin creado exitosamente")
         else:
             print("⚠️ El usuario admin ya existe para esta empresa.")
             
