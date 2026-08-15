@@ -11,7 +11,7 @@ empresa_id_null.py
 procfile.bak
 Transferencias modelo/
 /procesar_xml/
-
+test_env/
 *.log
 *.pdf
 otros/
