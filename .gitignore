@@ -3,10 +3,8 @@ __pycache__/
 data/
 *.exe
 *.pdf
-/data/bancaria.db
 .env
 database_t.py
-*.db
 empresa_id_null.py
 procfile.bak
 Transferencias modelo/
