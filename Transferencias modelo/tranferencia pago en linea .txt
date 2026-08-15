@@ -16,3 +16,12 @@ Banco Bandec: Pago completado.
  Importe: 560.00 CUP 
  Importe Pagado: 526.40 CUP 
  Nro. Transaccion: KW600KTOF6999.
+
+
+ Banco Bandec: Pago completado. 
+ Fecha: 15/8/2026 
+ Entidad: UEB La Cubana(UEB LA CUBANA) 
+ Id Compra: 8337981092 
+ Importe: 40.00 CUP 
+ Importe pagado: 38.40 CUP 
+ No. Transaccion: KW601JM0HP999

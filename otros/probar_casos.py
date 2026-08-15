@@ -1,5 +1,5 @@
 # test_normalizacion_avanzada.py
-from utils import normalizar_texto_transferencia
+from app.utils import normalizar_texto_transferencia
 
 def probar_casos():
     """Prueba diferentes formatos de texto bancario"""
