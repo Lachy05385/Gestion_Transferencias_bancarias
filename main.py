@@ -38,6 +38,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
+
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
@@ -54,6 +55,16 @@ app.include_router(contratos.router)
 #router = APIRouter(prefix="/admin", tags=["Administración"])
 
 #publicos 
+@app.get("/")
+def read_root():
+    return {
+        "mensaje": "API ContaFlow funcionando correctamente",
+        "estado": "online",
+        "documentacion": "/docs"
+    }
+
+
+
 
 @app.get("/landing", response_class=HTMLResponse)
 async def landing_page(request: Request):
