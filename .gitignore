@@ -13,3 +13,5 @@ test_env/
 *.log
 *.pdf
 otros/
+docker-compose.yml
+*.pyc
