@@ -1,3 +1,7 @@
+
+
+# Configurar CryptContext con Argon2 - VERSIÓN CORREGIDA
+# Quitamos el parámetro 'encoding' que no es soportado
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -5,8 +9,7 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-#from . import models, schemas
-from app import models,schemas
+from app import models, schemas
 from .database import get_db
 import os
 
@@ -15,33 +18,16 @@ SECRET_KEY = os.getenv("SECRET_KEY", "clave_secreta_super_segura_aqui_cambiar_en
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Configurar CryptContext con Argon2 - VERSIÓN CORREGIDA
-# Quitamos el parámetro 'encoding' que no es soportado
+# CAMBIO IMPORTANTE: Usar bcrypt en lugar de Argon2
 pwd_context = CryptContext(
-    schemes=["argon2"],  # Usar Argon2 en lugar de bcrypt
-    deprecated="auto",
-    
-    # Parámetros de Argon2 (ajustables según necesidades de seguridad/rendimiento)
-    argon2__time_cost=2,           # Número de iteraciones (mayor = más seguro, más lento)
-    argon2__memory_cost=102400,    # Memoria en KB (102400 KB = 100 MB)
-    argon2__parallelism=8,         # Número de hilos paralelos
-    argon2__hash_len=32,           # Longitud del hash en bytes
-    argon2__salt_len=16,           # Longitud del salt en bytes
-    # NOTA: 'encoding' no es un parámetro válido para Argon2 en passlib
+    schemes=["bcrypt"],  # <--- Cambio: bcrypt en lugar de argon2
+    deprecated="auto"
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_password_hash(password: str) -> str:
-    """
-    Hash de contraseña usando Argon2.
-    
-    Args:
-        password: Contraseña en texto plano
-    
-    Returns:
-        str: Hash de la contraseña
-    """
+    """Genera un hash de la contraseña usando bcrypt."""
     try:
         return pwd_context.hash(password)
     except Exception as e:
@@ -51,25 +37,19 @@ def get_password_hash(password: str) -> str:
         )
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verificar contraseña usando Argon2.
-    """
+    """Verifica una contraseña contra su hash usando bcrypt."""
     try:
         print(f"🔐 Verificando password...")
-        print(f"  Plain: '{plain_password}'")  # Las comillas muestran espacios/caracteres
-        print(f"  Hash:  {hashed_password[:50]}...")
-
-        # Asegurar que la contraseña sea string y esté limpia
         plain_password = str(plain_password).strip()
         result = pwd_context.verify(plain_password, hashed_password)
         print(f"  Resultado: {result}")
         return result
     except Exception as e:
         print(f"❌ Error verifying: {str(e)}")
-        # Imprime el tipo de error específico
-        import traceback
-        traceback.print_exc()
         return False
+
+# El resto del código (authenticate_user, create_access_token, etc.) 
+# permanece EXACTAMENTE IGUAL
 
 def authenticate_user(db: Session, email: str, password: str):
     user = db.query(models.Usuario).filter(models.Usuario.email == email).first()
