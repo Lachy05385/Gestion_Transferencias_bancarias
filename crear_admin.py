@@ -14,8 +14,9 @@ AD_PASSWORD = "Admin123!"
 #print("="*50)
 
 def crear_empresa_y_admin():
-    db = SessionLocal()
-    
+    db = SessionLocal()  # Esto ahora funciona correctamente
+
+
     try:
         # 1. Crear empresa principal
         nit_principal = "900000001"

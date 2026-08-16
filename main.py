@@ -2087,7 +2087,7 @@ import tempfile
 import os
 from fastapi import UploadFile, File, HTTPException, Depends
 #from app.database import engine, DB_PATH  # Asegúrate de importar DB_PATH de database.py
-from app.database import __all__
+#from app.database import __all__
 
 
 @app.post("/admin/restaurar-db")
