@@ -17,3 +17,4 @@ docker-compose.yml
 *.pyc
 test_turso.py
 auth.py
+test_turso_alchemy.py
