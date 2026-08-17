@@ -83,7 +83,6 @@ if IS_PRODUCTION:
             if parameters:
                 args = []
                 if isinstance(parameters, dict):
-                    # Si es dict, ordenar por posición
                     for key, value in parameters.items():
                         args.append(self._convert_param(value))
                 elif isinstance(parameters, (list, tuple)):
@@ -111,20 +110,17 @@ if IS_PRODUCTION:
                 self._rowcount = 0
                 self._description = None
                 
-                # Procesar resultados
                 if "results" in data and data["results"]:
                     result = data["results"][0]
                     if "response" in result and "result" in result["response"]:
                         result_data = result["response"]["result"]
                         
-                        # Obtener columnas (description)
                         if "cols" in result_data:
                             self._description = [
                                 (col.get("name"), None, None, None, None, None, None)
                                 for col in result_data["cols"]
                             ]
                         
-                        # Obtener filas
                         rows = result_data.get("rows", [])
                         for row in rows:
                             row_values = []
@@ -134,7 +130,6 @@ if IS_PRODUCTION:
                         
                         self._rowcount = len(self._results)
                         
-                        # Obtener last_insert_rowid
                         if "last_insert_rowid" in result_data:
                             self._lastrowid = result_data["last_insert_rowid"]
                 
@@ -159,17 +154,14 @@ if IS_PRODUCTION:
                 return {"type": "text", "value": str(value)}
         
         def fetchone(self):
-            """Obtiene una fila del resultado."""
             if self._results:
                 return self._results.pop(0)
             return None
         
         def fetchall(self):
-            """Obtiene todas las filas del resultado."""
             return self._results
         
         def fetchmany(self, size=None):
-            """Obtiene varias filas del resultado."""
             if size is None:
                 size = self.arraysize
             if self._results:
@@ -180,42 +172,45 @@ if IS_PRODUCTION:
         
         @property
         def rowcount(self):
-            """Número de filas afectadas."""
             return self._rowcount
         
         @property
         def lastrowid(self):
-            """Último ID insertado."""
             return self._lastrowid
         
         @property
         def description(self):
-            """Descripción de columnas."""
             return self._description
         
         def close(self):
-            """Cierra el cursor."""
             self.closed = True
     
     # Función para crear la conexión Turso
     def create_turso_connection():
         return TursoConnection()
     
-    # Crear el engine con SQLAlchemy
+    # Crear el engine
     engine = create_engine(
         "sqlite://",
         creator=create_turso_connection,
         poolclass=pool.StaticPool,
         connect_args={"check_same_thread": False}
     )
+    
+    # ⚠️ DESHABILITAR EL EVENTO regexp DE SQLALCHEMY
+    # Eliminamos los listeners que intentan crear la función regexp
+    from sqlalchemy.dialects.sqlite import base as sqlite_base
+    
+    # Remover el listener de regexp
+    if hasattr(sqlite_base, "_regexp_listener"):
+        sqlite_base._regexp_listener = None
+    
     print("✅ Conectado a Turso en la nube")
     
 else:
     # En local: Usar SQLite
-    import os
     from pathlib import Path
     
-    # Asegurar que el directorio data/ existe
     DATA_DIR = Path(__file__).resolve().parent.parent / "data"
     DATA_DIR.mkdir(exist_ok=True)
     
@@ -226,7 +221,7 @@ else:
     )
     print("✅ Usando SQLite local para desarrollo")
 
-# Sesión y Base (común para ambos casos)
+# Sesión y Base
 SessionLocal = sessionmaker(autocommit=False, bind=engine)
 Base = declarative_base()
 
@@ -238,18 +233,8 @@ def get_db():
         db.close()
 
 def create_tables():
-    """Crea todas las tablas en la base de datos."""
     from app import models
     Base.metadata.create_all(bind=engine)
     print("✅ Tablas creadas correctamente")
 
-# Evento para deshabilitar funciones no soportadas por Turso
-@event.listens_for(engine, "connect")
-def on_connect(dbapi_connection, connection_record):
-    """Deshabilita funciones SQLite que Turso no soporta."""
-    # Turso no soporta regexp, así que lo deshabilitamos
-    if hasattr(dbapi_connection, "create_function"):
-        try:
-            dbapi_connection.create_function("regexp", 2, lambda x, y: 0)
-        except:
-            pass
+# NO REGISTRAMOS NINGÚN LISTENER PARA EVITAR EL ERROR
