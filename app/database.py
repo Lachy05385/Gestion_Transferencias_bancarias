@@ -8,6 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import sqlalchemy.pool as pool
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool
 
 # Detectar entorno
 IS_PRODUCTION = os.getenv("RENDER", "false").lower() == "true"
@@ -193,7 +194,7 @@ if IS_PRODUCTION:
     engine = create_engine(
         "sqlite://",
         creator=create_turso_connection,
-        poolclass=pool.StaticPool,
+        poolclass=NullPool,
         connect_args={"check_same_thread": False}
     )
     
