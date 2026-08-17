@@ -7,6 +7,19 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import sqlalchemy.pool as pool
+from sqlalchemy.dialects.sqlite import pysqlite
+
+# Reemplazar el método set_regexp con una función vacía
+def dummy_set_regexp(self, dbapi_connection):
+    """No hace nada, evita el error."""
+    pass
+
+pysqlite.SQLiteDialect_pysqlite.set_regexp = dummy_set_regexp
+
+# También deshabilitar el listener en el evento
+pysqlite.SQLiteDialect_pysqlite._regexp_listener = None
+
+
 
 # Detectar entorno
 IS_PRODUCTION = os.getenv("RENDER", "false").lower() == "true"
