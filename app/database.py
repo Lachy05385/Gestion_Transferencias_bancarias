@@ -14,7 +14,6 @@ from sqlalchemy.event import remove
 
 # 1. Eliminar el listener existente
 try:
-    # Intentar eliminar el listener del evento
     from sqlalchemy.dialects.sqlite.base import _regexp_listener
     if hasattr(pysqlite.SQLiteDialect_pysqlite, '_regexp_listener'):
         remove(pysqlite.SQLiteDialect_pysqlite, 'connect', _regexp_listener)
@@ -73,8 +72,8 @@ if IS_PRODUCTION:
         def close(self):
             self.closed = True
         
-        # ⚠️ MÉTODOS REQUERIDOS POR SQLALCHEMY
-        def create_function(self, name, num_args, func):
+        # ⚠️ MÉTODOS REQUERIDOS POR SQLALCHEMY (con parámetros correctos)
+        def create_function(self, name, num_args, func, *, deterministic=False):
             """Simula create_function para evitar errores."""
             # No hacemos nada, solo evitamos el error
             pass
