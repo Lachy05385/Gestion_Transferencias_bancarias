@@ -7,8 +7,6 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import sqlalchemy.pool as pool
-from sqlalchemy.engine import Engine
-from sqlalchemy.pool import NullPool
 
 # Detectar entorno
 IS_PRODUCTION = os.getenv("RENDER", "false").lower() == "true"
@@ -32,27 +30,22 @@ if IS_PRODUCTION:
             self.transaction_active = False
         
         def cursor(self):
-            """Devuelve un cursor compatible con SQLAlchemy."""
             return TursoCursor(self)
         
         def execute(self, sql, parameters=None):
-            """Ejecuta una consulta SQL y devuelve un cursor."""
             cursor = self.cursor()
             cursor.execute(sql, parameters)
             return cursor
         
         def commit(self):
-            """No es necesario para Turso (autocommit), pero se mantiene por compatibilidad."""
             self.transaction_active = False
             return self
         
         def rollback(self):
-            """No es necesario para Turso (autocommit), pero se mantiene por compatibilidad."""
             self.transaction_active = False
             return self
         
         def close(self):
-            """Cierra la conexión."""
             self.closed = True
         
         def __enter__(self):
@@ -62,7 +55,6 @@ if IS_PRODUCTION:
             self.close()
     
     class TursoCursor:
-        """Cursor compatible con SQLAlchemy para Turso."""
         def __init__(self, connection):
             self.connection = connection
             self.arraysize = 1
@@ -73,14 +65,11 @@ if IS_PRODUCTION:
             self.closed = False
         
         def execute(self, sql, parameters=None):
-            """Ejecuta una consulta SQL."""
             if self.closed:
                 raise Exception("Cursor already closed")
             
-            # Preparar payload para Turso
             payload = {"requests": [{"type": "execute", "stmt": {"sql": sql}}]}
             
-            # Manejar parámetros
             if parameters:
                 args = []
                 if isinstance(parameters, dict):
@@ -142,7 +131,6 @@ if IS_PRODUCTION:
                 raise Exception(f"Error en ejecución: {str(e)}")
         
         def _convert_param(self, value):
-            """Convierte un valor de Python al formato de Turso."""
             if value is None:
                 return {"type": "null", "value": None}
             elif isinstance(value, bool):
@@ -186,25 +174,31 @@ if IS_PRODUCTION:
         def close(self):
             self.closed = True
     
-    # Función para crear la conexión Turso
+    # 🔧 PARCHE: Deshabilitar el listener de regexp en SQLAlchemy
+    from sqlalchemy.dialects.sqlite import pysqlite
+    
+    # Guardar el método original
+    original_connect = pysqlite.SQLiteDialect_pysqlite.connect
+    
+    def patched_connect(self, *args, **kwargs):
+        """Versión parcheada que NO registra el listener regexp."""
+        conn = original_connect(self, *args, **kwargs)
+        # No registramos el listener de regexp
+        return conn
+    
+    # Aplicar el parche
+    pysqlite.SQLiteDialect_pysqlite.connect = patched_connect
+    
+    # Crear el engine
     def create_turso_connection():
         return TursoConnection()
     
-    # Crear el engine
     engine = create_engine(
         "sqlite://",
         creator=create_turso_connection,
-        poolclass=NullPool,
+        poolclass=pool.StaticPool,
         connect_args={"check_same_thread": False}
     )
-    
-    # ⚠️ DESHABILITAR EL EVENTO regexp DE SQLALCHEMY
-    # Eliminamos los listeners que intentan crear la función regexp
-    from sqlalchemy.dialects.sqlite import base as sqlite_base
-    
-    # Remover el listener de regexp
-    if hasattr(sqlite_base, "_regexp_listener"):
-        sqlite_base._regexp_listener = None
     
     print("✅ Conectado a Turso en la nube")
     
@@ -237,5 +231,3 @@ def create_tables():
     from app import models
     Base.metadata.create_all(bind=engine)
     print("✅ Tablas creadas correctamente")
-
-# NO REGISTRAMOS NINGÚN LISTENER PARA EVITAR EL ERROR
