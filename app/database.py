@@ -31,6 +31,24 @@ pysqlite.SQLiteDialect_pysqlite.set_regexp = dummy_set_regexp
 # 3. Deshabilitar el listener en la clase
 pysqlite.SQLiteDialect_pysqlite._regexp_listener = None
 
+# 🔧 PARCHE PARA EL NIVEL DE AISLAMIENTO
+# Sobrescribir el método get_isolation_level para que devuelva un valor válido
+original_get_isolation_level = pysqlite.SQLiteDialect_pysqlite.get_isolation_level
+
+def patched_get_isolation_level(self, dbapi_conn):
+    """Devuelve un nivel de aislamiento válido para Turso."""
+    try:
+        # Intentar obtener el nivel real
+        result = original_get_isolation_level(self, dbapi_conn)
+        if result is not None:
+            return result
+    except:
+        pass
+    # Si falla o devuelve 0, usar el nivel por defecto
+    return "READ UNCOMMITTED"
+
+pysqlite.SQLiteDialect_pysqlite.get_isolation_level = patched_get_isolation_level
+
 # Detectar entorno
 IS_PRODUCTION = os.getenv("RENDER", "false").lower() == "true"
 
@@ -52,6 +70,8 @@ if IS_PRODUCTION:
             self.closed = False
             self.transaction_active = False
             self._callbacks = []
+            # Para el nivel de aislamiento
+            self.isolation_level = "READ UNCOMMITTED"
         
         def cursor(self):
             return TursoCursor(self)
@@ -72,10 +92,9 @@ if IS_PRODUCTION:
         def close(self):
             self.closed = True
         
-        # ⚠️ MÉTODOS REQUERIDOS POR SQLALCHEMY (con parámetros correctos)
+        # ⚠️ MÉTODOS REQUERIDOS POR SQLALCHEMY
         def create_function(self, name, num_args, func, *, deterministic=False):
             """Simula create_function para evitar errores."""
-            # No hacemos nada, solo evitamos el error
             pass
         
         def create_aggregate(self, name, num_args, aggregate):
@@ -224,15 +243,17 @@ if IS_PRODUCTION:
         def close(self):
             self.closed = True
     
-    # Crear el engine
+    # Crear el engine con el nivel de aislamiento configurado
     def create_turso_connection():
         return TursoConnection()
     
+    # 🔧 Configurar el engine con el nivel de aislamiento
     engine = create_engine(
         "sqlite://",
         creator=create_turso_connection,
         poolclass=pool.StaticPool,
-        connect_args={"check_same_thread": False}
+        connect_args={"check_same_thread": False},
+        isolation_level="READ UNCOMMITTED"  # 🔑 Forzar el nivel de aislamiento
     )
     
     print("✅ Conectado a Turso en la nube")
