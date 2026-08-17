@@ -3,23 +3,34 @@ import os
 import sys
 import requests
 import json
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import sqlalchemy.pool as pool
-from sqlalchemy.dialects.sqlite import pysqlite
 
-# Reemplazar el método set_regexp con una función vacía
+# 🔧 PARCHE RADICAL: Eliminar el listener regexp de SQLAlchemy
+from sqlalchemy.dialects.sqlite import pysqlite
+from sqlalchemy.event import remove
+
+# 1. Eliminar el listener existente
+try:
+    # Intentar eliminar el listener del evento
+    from sqlalchemy.dialects.sqlite.base import _regexp_listener
+    if hasattr(pysqlite.SQLiteDialect_pysqlite, '_regexp_listener'):
+        remove(pysqlite.SQLiteDialect_pysqlite, 'connect', _regexp_listener)
+        print("✅ Listener regexp eliminado")
+except:
+    pass
+
+# 2. Sobrescribir el método set_regexp con una función vacía
 def dummy_set_regexp(self, dbapi_connection):
     """No hace nada, evita el error."""
     pass
 
 pysqlite.SQLiteDialect_pysqlite.set_regexp = dummy_set_regexp
 
-# También deshabilitar el listener en el evento
+# 3. Deshabilitar el listener en la clase
 pysqlite.SQLiteDialect_pysqlite._regexp_listener = None
-
-
 
 # Detectar entorno
 IS_PRODUCTION = os.getenv("RENDER", "false").lower() == "true"
@@ -41,6 +52,7 @@ if IS_PRODUCTION:
             self.url = TURSO_DATABASE_URL.replace("libsql://", "https://")
             self.closed = False
             self.transaction_active = False
+            self._callbacks = []
         
         def cursor(self):
             return TursoCursor(self)
@@ -60,6 +72,32 @@ if IS_PRODUCTION:
         
         def close(self):
             self.closed = True
+        
+        # ⚠️ MÉTODOS REQUERIDOS POR SQLALCHEMY
+        def create_function(self, name, num_args, func):
+            """Simula create_function para evitar errores."""
+            # No hacemos nada, solo evitamos el error
+            pass
+        
+        def create_aggregate(self, name, num_args, aggregate):
+            """Simula create_aggregate para evitar errores."""
+            pass
+        
+        def create_collation(self, name, collation):
+            """Simula create_collation para evitar errores."""
+            pass
+        
+        def set_authorizer(self, authorizer):
+            """Simula set_authorizer para evitar errores."""
+            pass
+        
+        def set_progress_handler(self, handler, n):
+            """Simula set_progress_handler para evitar errores."""
+            pass
+        
+        def set_trace_callback(self, callback):
+            """Simula set_trace_callback para evitar errores."""
+            pass
         
         def __enter__(self):
             return self
@@ -186,21 +224,6 @@ if IS_PRODUCTION:
         
         def close(self):
             self.closed = True
-    
-    # 🔧 PARCHE: Deshabilitar el listener de regexp en SQLAlchemy
-    from sqlalchemy.dialects.sqlite import pysqlite
-    
-    # Guardar el método original
-    original_connect = pysqlite.SQLiteDialect_pysqlite.connect
-    
-    def patched_connect(self, *args, **kwargs):
-        """Versión parcheada que NO registra el listener regexp."""
-        conn = original_connect(self, *args, **kwargs)
-        # No registramos el listener de regexp
-        return conn
-    
-    # Aplicar el parche
-    pysqlite.SQLiteDialect_pysqlite.connect = patched_connect
     
     # Crear el engine
     def create_turso_connection():
