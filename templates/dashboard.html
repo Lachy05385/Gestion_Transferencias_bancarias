@@ -20,8 +20,6 @@
             display: flex;
             gap: 10px;
             margin-left: auto;
-            margin-bottom: 20px;
-            justify-content: flex-end;
         }
 
         .btn-export-excel, .btn-export-pdf {
@@ -120,7 +118,7 @@
         /* Stats Cards */
         .stats-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -150,17 +148,10 @@
             color: #333;
         }
 
-        .stat-card .sub-value {
-            font-size: 0.8em;
-            color: #888;
-            margin-top: 5px;
-        }
-
         .stat-card.enviadas .value { color: #f56565; }
         .stat-card.recibidas .value { color: #48bb78; }
         .stat-card.balance .value { color: #667eea; }
         .stat-card.pendientes .value { color: #ed8936; }
-        .stat-card.confirmadas .value { color: #48bb78; }
 
         /* Filtros */
         .filters-section {
@@ -285,24 +276,6 @@
             background: #f8f9fa;
         }
 
-        /* Estilo para filas de subtotal */
-        .subtotal-row td {
-            background-color: #f0f4ff;
-            font-weight: bold;
-            border-top: 2px solid #667eea;
-            border-bottom: 2px solid #667eea;
-        }
-
-        .subtotal-row td:first-child {
-            border-top-left-radius: 8px;
-            border-bottom-left-radius: 8px;
-        }
-
-        .subtotal-row td:last-child {
-            border-top-right-radius: 8px;
-            border-bottom-right-radius: 8px;
-        }
-
         .badge {
             display: inline-block;
             padding: 5px 10px;
@@ -396,12 +369,10 @@
             <div class="stat-card enviadas">
                 <h3>📤 Total Enviadas</h3>
                 <div class="value" id="totalEnviadas">-</div>
-                <div class="sub-value" id="totalEnviadasCount">- transacciones</div>
             </div>
             <div class="stat-card recibidas">
                 <h3>📥 Total Recibidas</h3>
                 <div class="value" id="totalRecibidas">-</div>
-                <div class="sub-value" id="totalRecibidasCount">- transacciones</div>
             </div>
             <div class="stat-card balance">
                 <h3>💰 Balance</h3>
@@ -410,16 +381,9 @@
             <div class="stat-card pendientes">
                 <h3>⏳ Pendientes</h3>
                 <div class="value" id="pendientes">-</div>
-                <div class="sub-value" id="pendientesMonto">Monto: -</div>
-            </div>
-            <div class="stat-card confirmadas">
-                <h3>✅ Confirmadas</h3>
-                <div class="value" id="confirmadas">-</div>
-                <div class="sub-value" id="confirmadasMonto">Monto: -</div>
             </div>
         </div>
-
-        <!-- Botones para exportar -->
+        <!--botones para  exportar  -->
         <div class="export-buttons">
             <button class="btn-export-excel" onclick="exportarExcel()">
                 📊 Exportar a Excel
@@ -428,8 +392,8 @@
                 📄 Exportar a PDF
             </button>
         </div>
-
         <!-- Filtros -->
+        <!-- Filtros - Versión mejorada -->
         <div class="filters-section">
             <h2>🔍 Filtrar Transacciones</h2>
             <div class="filters-row">
@@ -488,6 +452,8 @@
     </div>
 
     <script>
+        //const BASE_URL = 'http://localhost:8000';
+
         const BASE_URL = window.location.origin;
         let token = null;
         let user = null;
@@ -602,7 +568,6 @@
 
                 let fechaInicioStr = document.getElementById('fechaInicio')?.value || '';
                 let fechaFinStr = document.getElementById('fechaFin')?.value || '';
-                const banco = document.getElementById('filtroBanco')?.value?.toLowerCase() || '';
                 const moneda = document.getElementById('filtroMoneda')?.value || '';
                 const estado = document.getElementById('filtroEstado')?.value || '';
 
@@ -613,7 +578,6 @@
                     const fechaTransaccion = t.fechaOriginal || '';
                     if (fechaInicio && fechaTransaccion < fechaInicio) return false;
                     if (fechaFin && fechaTransaccion > fechaFin) return false;
-                    if (banco && !(t.ordenante?.toLowerCase().includes(banco) || t.beneficiario?.toLowerCase().includes(banco))) return false;
                     if (moneda && t.moneda !== moneda) return false;
                     if (estado && t.estado !== estado) return false;
                     if (tabActual === 'enviadas' && t.tipo !== 'enviada') return false;
@@ -633,35 +597,21 @@
             }
         }
 
-        // ========== ESTADÍSTICAS (CORREGIDAS) ==========
+        // ========== ESTADÍSTICAS ==========
         function actualizarEstadisticas() {
             const enviadas = transaccionesFiltradas.filter(t => t.tipo === 'enviada');
             const recibidas = transaccionesFiltradas.filter(t => t.tipo === 'recibida');
-            const pendientes = transaccionesFiltradas.filter(t => t.estado === 'PENDIENTE');
-            const confirmadas = transaccionesFiltradas.filter(t => t.estado === 'CONFIRMADA');
-            
             const totalEnviadas = enviadas.reduce((sum, t) => sum + (t.monto || 0), 0);
             const totalRecibidas = recibidas.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const totalPendientes = pendientes.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const totalConfirmadas = confirmadas.reduce((sum, t) => sum + (t.monto || 0), 0);
+            const pendientes = transaccionesFiltradas.filter(t => t.estado === 'PENDIENTE').length;
 
-            // Mostrar montos
             document.getElementById('totalEnviadas').textContent = totalEnviadas.toFixed(2);
             document.getElementById('totalRecibidas').textContent = totalRecibidas.toFixed(2);
             document.getElementById('balance').textContent = (totalRecibidas - totalEnviadas).toFixed(2);
-            
-            // Mostrar cantidad de pendientes y confirmadas (el TOTAL)
-            document.getElementById('pendientes').textContent = pendientes.length;
-            document.getElementById('confirmadas').textContent = confirmadas.length;
-            
-            // Mostrar montos como subtexto
-            document.getElementById('totalEnviadasCount').textContent = `${enviadas.length} transacciones`;
-            document.getElementById('totalRecibidasCount').textContent = `${recibidas.length} transacciones`;
-            document.getElementById('pendientesMonto').textContent = `Monto: ${totalPendientes.toFixed(2)}`;
-            document.getElementById('confirmadasMonto').textContent = `Monto: ${totalConfirmadas.toFixed(2)}`;
+            document.getElementById('pendientes').textContent = pendientes;
         }
 
-        // ========== RENDERIZAR TABLA CON SUBTOTALES POR BENEFICIARIO ==========
+        // ========== RENDERIZAR TABLA (CORREGIDA, SIN DUPLICADOS) ==========
         function renderizarTabla() {
             const container = document.getElementById('tableContainer');
             if (!transaccionesFiltradas.length) {
@@ -669,75 +619,36 @@
                 return;
             }
 
-            // Agrupar por BENEFICIARIO
-            const grupos = {};
-            transaccionesFiltradas.forEach(t => {
-                const key = t.beneficiario || 'Sin beneficiario';
-                if (!grupos[key]) {
-                    grupos[key] = [];
-                }
-                grupos[key].push(t);
-            });
-
-            // Ordenar grupos por nombre de beneficiario
-            const beneficiariosOrdenados = Object.keys(grupos).sort();
+            // Debug: ver la primera transacción
+            console.log('Primera transacción:', transaccionesFiltradas[0]);
 
             let html = '<table class="transactions-table" style="width:100%; border-collapse: collapse;">';
             html += '<thead><tr>';
             html += '<th>Fecha</th><th>N° Transacción</th><th>Tipo</th><th>Beneficiario</th><th>Ordenante</th><th>Monto</th><th>Moneda</th><th>Estado</th><th>Fecha Confirmación</th>';
             html += '</tr></thead><tbody>';
 
-            let totalGeneral = 0;
-
-            for (const beneficiario of beneficiariosOrdenados) {
-                const transacciones = grupos[beneficiario];
-                let subtotal = 0;
-
-                // Mostrar las transacciones del grupo
-                for (const t of transacciones) {
-                    const monto = t.monto || 0;
-                    subtotal += monto;
-                    totalGeneral += monto;
-
-                    const tipoClass = t.tipo === 'enviada' ? 'badge-enviada' : 'badge-recibida';
-                    const estadoClass = t.estado === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada';
-                    let fechaConfirm = '-';
-                    if (t.fecha_confirmacion) {
-                        fechaConfirm = new Date(t.fecha_confirmacion).toLocaleString();
-                    }
-                    html += `<tr>
-                        <td>${t.fecha}</td>
-                        <td><strong>${t.numero_transaccion || '-'}</strong></td>
-                        <td><span class="badge ${tipoClass}">${t.tipo === 'enviada' ? '📤 Enviada' : '📥 Recibida'}</span></td>
-                        <td><strong>${t.beneficiario || '-'}</strong></td>
-                        <td>${t.ordenante || '-'}</td>
-                        <td><strong>${monto.toFixed(2)}</strong></td>
-                        <td>${t.moneda}</td>
-                        <td><span class="badge ${estadoClass}">${t.estado}</span></td>
-                        <td>${fechaConfirm}</td>
-                    </tr>`;
+            for (const t of transaccionesFiltradas) {
+                const tipoClass = t.tipo === 'enviada' ? 'badge-enviada' : 'badge-recibida';
+                const estadoClass = t.estado === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada';
+                let fechaConfirm = '-';
+                if (t.fecha_confirmacion) {
+                    fechaConfirm = new Date(t.fecha_confirmacion).toLocaleString();
                 }
-
-                // Mostrar subtotal del grupo
-                html += `<tr class="subtotal-row">
-                    <td colspan="3" style="text-align: right;">📊 Subtotal ${beneficiario}:</td>
-                    <td></td>
-                    <td></td>
-                    <td><strong>${subtotal.toFixed(2)}</strong></td>
-                    <td colspan="3"></td>
+                html += `<tr>
+                    <td>${t.fecha}</td>
+                    <td><strong>${t.numero_transaccion || '-'}</strong></td>
+                    <td><span class="badge ${tipoClass}">${t.tipo === 'enviada' ? '📤 Enviada' : '📥 Recibida'}</span></td>
+                    <td>${t.beneficiario || '-'}</td>
+                    <td>${t.ordenante || '-'}</td>
+                    <td><strong>${(t.monto || 0).toFixed(2)}</strong></td>
+                    <td>${t.moneda}</td>
+                    <td><span class="badge ${estadoClass}">${t.estado}</span></td>
+                    <td>${fechaConfirm}</td>
                 </tr>`;
             }
-
-            // Mostrar total general
-            html += `<tr class="subtotal-row" style="background-color: #e8edff;">
-                <td colspan="3" style="text-align: right; font-size: 1.1em;">💰 TOTAL GENERAL:</td>
-                <td></td>
-                <td></td>
-                <td style="font-size: 1.1em;"><strong>${totalGeneral.toFixed(2)}</strong></td>
-                <td colspan="3"></td>
-            </tr>`;
-
             html += '</tbody></table>';
+            
+            console.log('HTML generado:', html.substring(0, 200));
             container.innerHTML = html;
         }
 
@@ -755,19 +666,19 @@
         function limpiarFiltros() {
             document.getElementById('fechaInicio').value = '';
             document.getElementById('fechaFin').value = '';
-            document.getElementById('filtroBanco').value = '';
             document.getElementById('filtroMoneda').value = '';
             document.getElementById('filtroEstado').value = '';
             aplicarFiltros();
         }
-
-        // ========== EXPORTAR A EXCEL ==========
+        // ========== EXPORTAR A EXCEL (CLIENTE) ==========
         async function exportarExcel() {
             if (!transaccionesFiltradas.length) {
                 mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
+                alert("Debes Filtrar Transaciones...")
                 return;
             }
 
+            // Preparar los datos para la hoja de cálculo
             const datos = transaccionesFiltradas.map(t => ({
                 'Fecha': t.fecha || '',
                 'N° Transacción': t.numero_transaccion || '',
@@ -780,51 +691,59 @@
                 'Fecha Confirmación': t.fecha_confirmacion ? new Date(t.fecha_confirmacion).toLocaleString() : ''
             }));
 
+            // Crear hoja de trabajo
             const ws = XLSX.utils.json_to_sheet(datos);
+            // Ajustar anchos de columna (opcional)
             const wscols = [
                 {wch:12}, {wch:18}, {wch:10}, {wch:25}, {wch:25}, {wch:12}, {wch:8}, {wch:12}, {wch:20}
             ];
             ws['!cols'] = wscols;
 
+            // Crear libro y descargar
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
             XLSX.writeFile(wb, `transacciones_${new Date().toISOString().slice(0,19)}.xlsx`);
             mostrarMensajeTemporal('✅ Excel exportado correctamente', 'success');
         }
 
-        // ========== EXPORTAR A PDF ==========
+        // ========== EXPORTAR A PDF (CLIENTE) ==========
+        // ========== EXPORTAR A PDF (CLIENTE) CON RESUMEN DE MONTOS Y RANGO DE FECHAS ==========
         async function exportarPDF() {
             if (!transaccionesFiltradas.length) {
                 mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
                 return;
             }
 
+            // Obtener el rango de fechas de los filtros actuales
             let fechaInicioRaw = document.getElementById('fechaInicio')?.value || '';
             let fechaFinRaw = document.getElementById('fechaFin')?.value || '';
+            // Formatear para mostrar en el título (DD/MM/YYYY) tal como se ingresó
             const rangoTexto = (fechaInicioRaw && fechaFinRaw) 
                 ? `${fechaInicioRaw} - ${fechaFinRaw}`
                 : (fechaInicioRaw ? `Desde ${fechaInicioRaw}` : (fechaFinRaw ? `Hasta ${fechaFinRaw}` : 'Todos los períodos'));
 
+            // Calcular totales
             const totalMonto = transaccionesFiltradas.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const pendientes = transaccionesFiltradas.filter(t => t.estado === 'PENDIENTE');
-            const confirmadas = transaccionesFiltradas.filter(t => t.estado === 'CONFIRMADA');
+            const pendientesCount = transaccionesFiltradas.filter(t => t.estado === 'PENDIENTE').length;
+            const confirmadasCount = transaccionesFiltradas.filter(t => t.estado === 'CONFIRMADA').length;
+            const enviadasCount = transaccionesFiltradas.filter(t => t.tipo === 'enviada').length;
+            const recibidasCount = transaccionesFiltradas.filter(t => t.tipo === 'recibida').length;
             
-            const montoPendientes = pendientes.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const montoConfirmadas = confirmadas.reduce((sum, t) => sum + (t.monto || 0), 0);
+            // Sumas de montos por estado
+            const montoPendientes = transaccionesFiltradas
+                .filter(t => t.estado === 'PENDIENTE')
+                .reduce((sum, t) => sum + (t.monto || 0), 0);
+            const montoConfirmadas = transaccionesFiltradas
+                .filter(t => t.estado === 'CONFIRMADA')
+                .reduce((sum, t) => sum + (t.monto || 0), 0);
 
-            // Agrupar por BENEFICIARIO
-            const grupos = {};
-            transaccionesFiltradas.forEach(t => {
-                const key = t.beneficiario || 'Sin beneficiario';
-                if (!grupos[key]) grupos[key] = [];
-                grupos[key].push(t);
-            });
-
+            // Crear elemento contenedor para el PDF
             const printContent = document.createElement('div');
             printContent.style.padding = '15px';
             printContent.style.fontFamily = 'Arial, sans-serif';
             printContent.style.fontSize = '12px';
 
+            // Título con rango de fechas
             const title = document.createElement('h2');
             title.textContent = `Reporte de Transacciones - ${rangoTexto}`;
             title.style.textAlign = 'center';
@@ -832,12 +751,14 @@
             title.style.margin = '0 0 10px 0';
             printContent.appendChild(title);
 
+            // Fecha de generación
             const fechaGen = document.createElement('p');
             fechaGen.textContent = `Generado el: ${new Date().toLocaleString()}`;
             fechaGen.style.textAlign = 'center';
             fechaGen.style.marginBottom = '15px';
             printContent.appendChild(fechaGen);
 
+            // Resumen con totales y montos por estado
             const resumenDiv = document.createElement('div');
             resumenDiv.style.display = 'flex';
             resumenDiv.style.flexWrap = 'wrap';
@@ -849,11 +770,14 @@
             resumenDiv.innerHTML = `
                 <div><strong>📊 Total transacciones:</strong> ${transaccionesFiltradas.length}</div>
                 <div><strong>💰 Monto total:</strong> ${totalMonto.toFixed(2)}</div>
-                <div><strong>⏳ Pendientes:</strong> ${pendientes.length} (Monto: ${montoPendientes.toFixed(2)})</div>
-                <div><strong>✅ Confirmadas:</strong> ${confirmadas.length} (Monto: ${montoConfirmadas.toFixed(2)})</div>
+                <div><strong>⏳ Pendientes:</strong> ${pendientesCount} (Monto: ${montoPendientes.toFixed(2)})</div>
+                <div><strong>✅ Confirmadas:</strong> ${confirmadasCount} (Monto: ${montoConfirmadas.toFixed(2)})</div>
+                <div><strong>📤 Enviadas:</strong> ${enviadasCount}</div>
+                <div><strong>📥 Recibidas:</strong> ${recibidasCount}</div>
             `;
             printContent.appendChild(resumenDiv);
 
+            // Tabla de transacciones (igual que antes)
             const table = document.createElement('table');
             table.style.width = '100%';
             table.style.borderCollapse = 'collapse';
@@ -876,108 +800,32 @@
             table.appendChild(thead);
 
             const tbody = document.createElement('tbody');
-            
-            // Mostrar por grupos con subtotales
-            for (const [beneficiario, transacciones] of Object.entries(grupos)) {
-                let subtotal = 0;
-                for (const t of transacciones) {
-                    const monto = t.monto || 0;
-                    subtotal += monto;
-                    const row = document.createElement('tr');
-                    const cells = [
-                        t.fecha || '',
-                        t.numero_transaccion || '',
-                        t.tipo === 'enviada' ? 'Enviada' : 'Recibida',
-                        t.beneficiario || '',
-                        t.ordenante || '',
-                        monto.toFixed(2),
-                        t.moneda || '',
-                        t.estado || '',
-                        t.fecha_confirmacion ? new Date(t.fecha_confirmacion).toLocaleString() : ''
-                    ];
-                    cells.forEach(cellText => {
-                        const td = document.createElement('td');
-                        td.textContent = cellText;
-                        td.style.border = '1px solid #ddd';
-                        td.style.padding = '6px';
-                        row.appendChild(td);
-                    });
-                    tbody.appendChild(row);
-                }
-                // Subtotal del grupo
-                const subRow = document.createElement('tr');
-                subRow.style.backgroundColor = '#f0f4ff';
-                subRow.style.fontWeight = 'bold';
-                const td1 = document.createElement('td');
-                td1.colSpan = 3;
-                td1.textContent = `📊 Subtotal ${beneficiario}:`;
-                td1.style.border = '1px solid #ddd';
-                td1.style.padding = '6px';
-                td1.style.textAlign = 'right';
-                subRow.appendChild(td1);
-                const td2 = document.createElement('td');
-                td2.textContent = '';
-                td2.style.border = '1px solid #ddd';
-                td2.style.padding = '6px';
-                subRow.appendChild(td2);
-                const td3 = document.createElement('td');
-                td3.textContent = '';
-                td3.style.border = '1px solid #ddd';
-                td3.style.padding = '6px';
-                subRow.appendChild(td3);
-                const td4 = document.createElement('td');
-                td4.textContent = subtotal.toFixed(2);
-                td4.style.border = '1px solid #ddd';
-                td4.style.padding = '6px';
-                td4.style.fontWeight = 'bold';
-                subRow.appendChild(td4);
-                const td5 = document.createElement('td');
-                td5.colSpan = 3;
-                td5.textContent = '';
-                td5.style.border = '1px solid #ddd';
-                td5.style.padding = '6px';
-                subRow.appendChild(td5);
-                tbody.appendChild(subRow);
+            for (const t of transaccionesFiltradas) {
+                const row = document.createElement('tr');
+                const cells = [
+                    t.fecha || '',
+                    t.numero_transaccion || '',
+                    t.tipo === 'enviada' ? 'Enviada' : 'Recibida',
+                    t.beneficiario || '',
+                    t.ordenante || '',
+                    (t.monto || 0).toFixed(2),
+                    t.moneda || '',
+                    t.estado || '',
+                    t.fecha_confirmacion ? new Date(t.fecha_confirmacion).toLocaleString() : ''
+                ];
+                cells.forEach(cellText => {
+                    const td = document.createElement('td');
+                    td.textContent = cellText;
+                    td.style.border = '1px solid #ddd';
+                    td.style.padding = '6px';
+                    row.appendChild(td);
+                });
+                tbody.appendChild(row);
             }
-
-            // Total general
-            const totalRow = document.createElement('tr');
-            totalRow.style.backgroundColor = '#e8edff';
-            totalRow.style.fontWeight = 'bold';
-            const tdTotal1 = document.createElement('td');
-            tdTotal1.colSpan = 3;
-            tdTotal1.textContent = '💰 TOTAL GENERAL:';
-            tdTotal1.style.border = '1px solid #ddd';
-            tdTotal1.style.padding = '6px';
-            tdTotal1.style.textAlign = 'right';
-            totalRow.appendChild(tdTotal1);
-            const tdTotal2 = document.createElement('td');
-            tdTotal2.textContent = '';
-            tdTotal2.style.border = '1px solid #ddd';
-            tdTotal2.style.padding = '6px';
-            totalRow.appendChild(tdTotal2);
-            const tdTotal3 = document.createElement('td');
-            tdTotal3.textContent = '';
-            tdTotal3.style.border = '1px solid #ddd';
-            tdTotal3.style.padding = '6px';
-            totalRow.appendChild(tdTotal3);
-            const tdTotal4 = document.createElement('td');
-            tdTotal4.textContent = totalMonto.toFixed(2);
-            tdTotal4.style.border = '1px solid #ddd';
-            tdTotal4.style.padding = '6px';
-            tdTotal4.style.fontWeight = 'bold';
-            totalRow.appendChild(tdTotal4);
-            const tdTotal5 = document.createElement('td');
-            tdTotal5.colSpan = 3;
-            tdTotal5.textContent = '';
-            tdTotal5.style.border = '1px solid #ddd';
-            tdTotal5.style.padding = '6px';
-            totalRow.appendChild(tdTotal5);
-            tbody.appendChild(totalRow);
-
             table.appendChild(tbody);
             printContent.appendChild(table);
 
+            // Pie de firma
             const firmaDiv = document.createElement('div');
             firmaDiv.style.marginTop = '30px';
             firmaDiv.style.textAlign = 'right';
@@ -992,6 +840,7 @@
             `;
             printContent.appendChild(firmaDiv);
 
+            // Opciones para html2pdf (horizontal landscape)
             const opt = {
                 margin:        [0.5, 0.5, 0.5, 0.5],
                 filename:     `transacciones_${new Date().toISOString().slice(0,19)}.pdf`,
@@ -1002,8 +851,56 @@
 
             html2pdf().set(opt).from(printContent).save();
             mostrarMensajeTemporal('📄 PDF exportado correctamente', 'success');
+        }        
+        // ========== EXPORTACIONES ==========
+        async function resumenExportarExcel() {
+            token = getToken();
+            if (!token) return;
+            try {
+                mostrarMensajeTemporal('📊 Generando Excel...', 'success');
+                const response = await fetch(`${BASE_URL}/transacciones/exportar/excel`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'transacciones.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    mostrarMensajeTemporal('✅ Excel descargado', 'success');
+                } else throw new Error('Error exportar');
+            } catch (error) {
+                mostrarMensajeTemporal(`❌ ${error.message}`, 'error');
+            }
         }
-
+        async function ResumenExportarPDF() {
+            token = getToken();
+            if (!token) return;
+            try {
+                mostrarMensajeTemporal('📄 Generando PDF...', 'success');
+                const response = await fetch(`${BASE_URL}/transacciones/exportar/pdf`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'transacciones.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    mostrarMensajeTemporal('✅ PDF descargado', 'success');
+                } else throw new Error('Error exportar');
+            } catch (error) {
+                mostrarMensajeTemporal(`❌ ${error.message}`, 'error');
+            }
+        }
         function mostrarMensajeTemporal(mensaje, tipo) {
             const msgDiv = document.createElement('div');
             msgDiv.textContent = mensaje;
