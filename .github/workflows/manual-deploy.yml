@@ -51,3 +51,22 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/gestion_transferencias_bancarias:${{ github.ref_name }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/gestion_transferencias_bancarias:${{ github.ref_name }}
           cache-to: type=inline
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Redeploy no VPS via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            cd ~/Projects/infra_kubernetes
+            git pull
+            docker stack deploy -c stacks/gestion_transferencias_bancarias-stack.yaml gestion_transferencias_bancarias --with-registry-auth
