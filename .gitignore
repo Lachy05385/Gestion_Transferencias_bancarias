@@ -33,3 +33,4 @@ empresa_id_null.py
 test_api.py
 test_turso_alchemy.py
 *.yml
+!.github/workflows/*.yml
