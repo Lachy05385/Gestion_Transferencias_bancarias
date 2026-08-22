@@ -16,3 +16,10 @@ test_env/
 *.pdf
 otros/
 runtime.txt
+prockfile.bak
+test_turso.py
+testing.py
+empresa_id_null.py
+test_api.py
+test_turso_alchemy.py
+*.yml
