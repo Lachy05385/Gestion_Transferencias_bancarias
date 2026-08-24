@@ -36,7 +36,7 @@ crear_empresa_y_admin()
 app = FastAPI(
     title="API de Gestión Bancaria",
     description="API para procesar y gestionar transacciones bancarias con usuarios",
-    version="2.0.1" # TODO da para usar pyproject.toml para versionar automaticamente
+    version="2.0.2" # TODO da para usar pyproject.toml para versionar automaticamente
 )
 
 # Configurar CORS
