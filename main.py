@@ -26,7 +26,8 @@ from app.models import EstadoTransaccion
 from app.auth import get_password_hash
 from app.auth import verify_password
 from crear_admin import crear_empresa_y_admin
-from app.routers import contratos 
+from app.routers import contratos
+from app.routers import empresa
 
 
 # Crear tablas
@@ -49,6 +50,7 @@ app.add_middleware(
 
 
 app.include_router(contratos.router)
+app.include_router(empresa.router)
 
 
 #router = APIRouter(prefix="/admin", tags=["Administración"])
@@ -2360,5 +2362,6 @@ async def restaurar_desde_csv(
 if __name__ == "__main__":
     import os
     import uvicorn
+    import crear_admin
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)

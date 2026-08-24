@@ -27,6 +27,9 @@ class EmpresaBase(BaseModel):
 class EmpresaCreate(EmpresaBase):
     pass
 
+class EmpresaUpdate(EmpresaBase):
+    pass
+
 class EmpresaResponse(EmpresaBase):
     id: int
     fecha_creacion: datetime
