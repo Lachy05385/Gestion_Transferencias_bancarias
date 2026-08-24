@@ -17,6 +17,7 @@ data/
 .env
 database_t.py
 *.db
+*.pyc
 empresa_id_null.py
 procfile.bak
 Transferencias modelo/
