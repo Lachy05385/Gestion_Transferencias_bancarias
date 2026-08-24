@@ -15,13 +15,9 @@ print(ENV_PATH)
 #
 
 # Leer variables de entorno (con valores por defecto si no existen)
-USER_ADMIN = os.getenv("USER_ADMIN", "admin@contaflow.com")
-AD_PASSWORD = os.getenv("AD_PASSWORD", "Admin123!")
-print("="*50)
-print("USER -> ", USER_ADMIN,"PASSWORD -> ",AD_PASSWORD )
-print("="*50)
-# 
-# #
+USER_ADMIN = os.getenv("USER_ADMIN", default = None)
+AD_PASSWORD = os.getenv("AD_PASSWORD", default = None)
+
 
 
 def crear_empresa_y_admin():
