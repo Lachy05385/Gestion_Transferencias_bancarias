@@ -7,6 +7,8 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     environment: production
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
 
     steps:
       - name: Determinar Branch ou Tag
@@ -18,9 +20,11 @@ jobs:
           if [[ "$REF" == refs/heads/* ]]; then
             echo "Branch detectada: $REF_NAME"
             echo "ref=$REF_NAME" >> $GITHUB_ENV
+            echo "ref=$REF_NAME" >> $GITHUB_OUTPUT
           elif [[ "$REF" == refs/tags/* ]]; then
             echo "Tag detectada: $REF_NAME"
             echo "ref=$REF_NAME" >> $GITHUB_ENV
+            echo "ref=$REF_NAME" >> $GITHUB_OUTPUT
           else
             echo "❌ ERRO: Não foi possível determinar se é uma branch ou tag!"
             exit 1
@@ -69,4 +73,5 @@ jobs:
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
             cd ~/Projects/infra_kubernetes
             git pull
+            export TAG="${{ needs.build-and-push.outputs.ref }}"
             docker stack deploy -c stacks/gestion_transferencias_bancarias-stack.yaml gestion_transferencias_bancarias --with-registry-auth
