@@ -1,5 +1,15 @@
 venv/
 __pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
 data/
 *.exe
 *.pdf
@@ -24,3 +34,4 @@ empresa_id_null.py
 test_api.py
 test_turso_alchemy.py
 *.yml
+!.github/workflows/*.yml

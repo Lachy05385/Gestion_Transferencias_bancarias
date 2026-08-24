@@ -1,0 +1,18 @@
+.git
+.gitignore
+.vscode
+.venv
+venv
+__pycache__
+*.pyc
+*.db
+*.pdf
+*.log
+otros/
+Transferencias modelo/
+data/
+requirements.txt
+runtime.txt
+procfile.bak
+testing.py
+empresa_id_null.py
