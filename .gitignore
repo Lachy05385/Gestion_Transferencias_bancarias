@@ -1,37 +1,77 @@
-venv/
+# ========================================
+# INVESTIGACIÓN Y SCRIPTS DE PRUEBA (NO SUBEN)
+# ========================================
+# Tus carpetas de investigación
+investigacion/
+scripts_prueba/
+pruebas/
+experimentos/
+sandbox/
+playground/
+
+# Tus carpetas existentes
+otros/
+Transferencias modelo/
+procesar_xml/
+
+# Scripts de prueba específicos
+test_*.py
+testing.py
+test_*.ipynb
+empresa_id_null.py
+database_t.py
+cargar_CSV.py
+crear_admin.py
+procfile.bak
+prockfile.bak
+runtime.txt
+*.bak
+
+# Documentos de investigación
+*.pdf
+*.docx
+*.txt
+!README.txt          # Excepción para READMEs
+!requirements.txt    # Excepción para requirements
+
+# ========================================
+# CÓDIGO DE PRODUCCIÓN QUE SÍ SUBE
+# ========================================
+# Estos archivos NO deben estar en .gitignore:
+# app/
+# main.py
+# Dockerfile
+# .env.example
+# .github/workflows/
+# pyproject.toml
+# uv.lock
+
+# ========================================
+# PYTHON (SIEMPRE IGNORAR)
+# ========================================
 __pycache__/
 *.py[cod]
-*$py.class
-.Python
-*.egg-info/
-*.egg
+*.pyc
+*.pyo
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-build/
-dist/
-data/
-*.exe
-*.pdf
-/data/bancaria.db
+venv/
+env/
+.venv/
 .env
-database_t.py
+
+# ========================================
+# IDE Y SISTEMA
+# ========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ========================================
+# BASE DE DATOS
+# ========================================
 *.db
-*.pyc
-empresa_id_null.py
-procfile.bak
-Transferencias modelo/
-/procesar_xml/
-test_env/
-*.log
-*.pdf
-otros/
-runtime.txt
-prockfile.bak
-test_turso.py
-testing.py
-empresa_id_null.py
-test_api.py
-test_turso_alchemy.py
-*.yml
-!.github/workflows/*.yml
+*.sqlite
+*.sqlite3
