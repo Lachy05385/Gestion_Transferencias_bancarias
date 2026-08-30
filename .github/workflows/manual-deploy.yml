@@ -1,0 +1,77 @@
+name: Manual Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+
+    steps:
+      - name: Determinar Branch ou Tag
+        id: ref
+        run: |
+          REF="${{ github.ref }}"
+          REF_NAME="${{ github.ref_name }}"
+
+          if [[ "$REF" == refs/heads/* ]]; then
+            echo "Branch detectada: $REF_NAME"
+            echo "ref=$REF_NAME" >> $GITHUB_ENV
+            echo "ref=$REF_NAME" >> $GITHUB_OUTPUT
+          elif [[ "$REF" == refs/tags/* ]]; then
+            echo "Tag detectada: $REF_NAME"
+            echo "ref=$REF_NAME" >> $GITHUB_ENV
+            echo "ref=$REF_NAME" >> $GITHUB_OUTPUT
+          else
+            echo "❌ ERRO: Não foi possível determinar se é uma branch ou tag!"
+            exit 1
+          fi
+
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ref }}
+
+      - name: Login no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Configurar QEMU (para compatibilidade multi-arch)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build e Push da Imagem
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/gestion_transferencias_bancarias:${{ github.ref_name }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/gestion_transferencias_bancarias:${{ github.ref_name }}
+          cache-to: type=inline
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Redeploy no VPS via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            cd ~/Projects/infra_kubernetes
+            git pull
+            export TAG="${{ needs.build-and-push.outputs.ref }}"
+            docker stack deploy -c stacks/gestion_transferencias_bancarias-stack.yaml gestion_transferencias_bancarias --with-registry-auth
