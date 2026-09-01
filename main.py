@@ -25,18 +25,18 @@ from fastapi import APIRouter, Request
 from app.models import EstadoTransaccion
 from app.auth import get_password_hash
 from app.auth import verify_password
-from crear_admin import crear_empresa_y_admin
+#from crear_admin import crear_empresa_y_admin
 from app.routers import contratos
 from app.routers import empresa
 
 
 # Crear tablas
 create_tables()
-crear_empresa_y_admin()
+#crear_empresa_y_admin()
 app = FastAPI(
     title="API de Gestión Bancaria",
     description="API para procesar y gestionar transacciones bancarias con usuarios",
-    version="2.0.4" # TODO da para usar pyproject.toml para versionar automaticamente
+    version="2.0.5" # TODO da para usar pyproject.toml para versionar automaticamente
 )
 
 # Configurar CORS
