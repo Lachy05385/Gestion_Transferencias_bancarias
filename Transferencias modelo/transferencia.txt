@@ -1,0 +1,6 @@
+Banco Popular de Ahorro:  La Transferencia fue completada. 
+ Fecha: 12/3/2026 
+ Beneficiario: 9205XXXXXXXX7786 
+ Ordenante: 9205XXXXXXXX9210 
+ Monto: 10000.00 CUP 
+ Nro. Transaccion: BR600CNNS7997
