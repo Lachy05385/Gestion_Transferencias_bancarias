@@ -18,4 +18,3 @@ docker-compose.yml
 test_turso.py
 test_turso_alchemy.py
 test_api.py
-dashboard.html
