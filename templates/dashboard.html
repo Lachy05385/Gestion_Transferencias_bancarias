@@ -1069,7 +1069,7 @@
         }
 
         // ========== EXPORTAR A EXCEL ==========
-       async function exportarExcel() {
+        async function exportarExcel() {
             if (!transaccionesFiltradas.length) {
                 mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
                 return;
@@ -1103,8 +1103,8 @@
             XLSX.writeFile(wb, `transacciones_${tipoSeleccionado}_${new Date().toISOString().slice(0,19)}.xlsx`);
             mostrarMensajeTemporal('✅ Excel exportado correctamente', 'success');
         }
+
         // ========== EXPORTAR A PDF - VERSIÓN CORREGIDA ==========// ========== EXPORTAR A PDF - VERSIÓN FINAL CORREGIDA ==========
-        // ========== EXPORTAR A PDF - VERSIÓN DEFINITIVA ==========
         async function exportarPDF() {
             if (!transaccionesFiltradas.length) {
                 mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
@@ -1376,6 +1376,7 @@
                 }
             }
         }
+
         function mostrarMensajeTemporal(mensaje, tipo) {
             const msgDiv = document.createElement('div');
             msgDiv.textContent = mensaje;

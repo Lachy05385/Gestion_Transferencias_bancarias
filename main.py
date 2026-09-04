@@ -261,7 +261,7 @@ def registrar_usuario(
 #=========  MODIFICAR USUARIOS ===================
 from fastapi import Body, HTTPException, Depends
 
-@app.patch("/usuarios/{usuario_id}", response_model=schemas.UserResponse)
+'''@app.patch("/usuarios/{usuario_id}", response_model=schemas.UserResponse)
 def actualizar_usuario(
     usuario_id: int,
     nombre: Optional[str] = Body(None),
@@ -311,7 +311,7 @@ def actualizar_usuario(
     db.commit()
     db.refresh(usuario)
     return usuario
-
+'''
 
 # ========== ENDPOINTS PARA ADMIN (ELIMINAR Y EDITAR USUARIOS) ==========
 
@@ -390,6 +390,7 @@ def editar_usuario(
     
     db.commit()
     db.refresh(usuario)
+    return usuario  # ⬅️ ¡Esto es lo que faltaba!
     
 @app.patch("/admin/usuarios/{usuario_id}/desactivar")
 def desactivar_usuario(

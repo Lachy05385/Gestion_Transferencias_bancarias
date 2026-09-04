@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
+from app.auth import get_current_active_user, get_current_user
 import sys
 import os
 
@@ -12,7 +13,6 @@ from app.database import get_db
 import models
 import schemas
 import crud
-from app.auth import get_current_active_user
 
 router = APIRouter(prefix="/admin", tags=["Administración"])
 
@@ -71,7 +71,7 @@ def crear_usuario_por_admin(
 @debug_endpoint
 def eliminar_usuario_logicamente(
     usuario_id: int,
-    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    current_user: models.Usuario = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
