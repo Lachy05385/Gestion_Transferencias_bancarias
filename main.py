@@ -996,6 +996,8 @@ def obtener_transaccion(
 async def eliminar_transaccion_page(request: Request):
     """Página para eliminar transacciones"""
     return templates.TemplateResponse("eliminar_transaccion.html", {"request": request})
+
+
 @app.delete("/transacciones/{transaccion_id}")
 def eliminar_transaccion(
     transaccion_id: int,
@@ -1004,18 +1006,19 @@ def eliminar_transaccion(
 ):
     """
     Eliminar una transacción (solo el usuario propietario o admin puede hacerlo)
+    No se puede eliminar si está confirmada (excepto admin)
     """
     print("="*60)
     print(f"🗑️ Eliminando transacción ID: {transaccion_id}")
     print(f"👤 Usuario: {current_user.email} (rol: {current_user.rol})")
     
-    # Buscar la transacción
+    # Buscar la transacción del usuario actual
     transaccion = db.query(models.Transaccion).filter(
         models.Transaccion.id == transaccion_id,
         models.Transaccion.usuario_id == current_user.id
     ).first()
     
-    # Si es admin, puede eliminar cualquier transacción
+    # Si no es del usuario y es admin, buscar cualquier transacción
     if not transaccion and current_user.rol == "admin":
         transaccion = db.query(models.Transaccion).filter(
             models.Transaccion.id == transaccion_id
@@ -1023,8 +1026,28 @@ def eliminar_transaccion(
         if transaccion:
             print(f"⚠️ Admin eliminando transacción de otro usuario (ID: {transaccion.usuario_id})")
     
+    # Si no se encontró la transacción
     if not transaccion:
-        raise HTTPException(status_code=404, detail="Transacción no encontrada")
+        raise HTTPException(
+            status_code=404, 
+            detail="Transacción no encontrada"
+        )
+    
+    # Verificar si la transacción está confirmada
+    if transaccion.estado == "confirmada":
+        # Solo admin puede eliminar transacciones 
+        info = {}
+        if current_user.rol != "admin":
+            return {
+                "success": False,
+                "message": "No se puede eliminar una transacción que ya está confirmada. Solo un administrador puede hacerlo.",
+                "id": transaccion_id,
+                "estado": transaccion.estado
+            }, 403
+            #return info,403
+        else:
+            print(f"⚠️ Admin eliminando transacción confirmada (ID: {transaccion_id})")
+
     
     # Guardar información para log
     info = f"{transaccion.fecha} - {transaccion.numero_transaccion} - {transaccion.monto} {transaccion.moneda}"
@@ -1036,8 +1059,12 @@ def eliminar_transaccion(
     print(f"✅ Transacción eliminada: {info}")
     print("="*60)
     
-    return {"message": "Transacción eliminada correctamente", "id": transaccion_id, "info": info}
-
+    return {
+        "success": True,
+        "message": "Transacción eliminada correctamente", 
+        "id": transaccion_id, 
+        "info": info
+    }
 
 @app.put("/transacciones/{transaccion_id}", response_model=schemas.TransaccionResponse)
 def actualizar_transaccion_completa(

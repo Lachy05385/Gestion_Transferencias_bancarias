@@ -243,7 +243,50 @@
             gap: 20px;
         }
 
-        .report-options label {
+        .report-options .radio-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-right: 2px solid #e0e0e0;
+            padding-right: 15px;
+        }
+
+        .report-options .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.95em;
+        }
+
+        .report-options .radio-group input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .report-options .radio-group .label-todas {
+            color: #555;
+        }
+
+        .report-options .radio-group .label-enviadas {
+            color: #f56565;
+        }
+
+        .report-options .radio-group .label-recibidas {
+            color: #48bb78;
+        }
+
+        .report-options .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .report-options .checkbox-group label {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -253,7 +296,7 @@
             font-weight: 500;
         }
 
-        .report-options input[type="checkbox"] {
+        .report-options .checkbox-group input[type="checkbox"] {
             width: 18px;
             height: 18px;
             cursor: pointer;
@@ -266,30 +309,10 @@
             margin-right: 10px;
         }
 
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .tab-btn {
-            background: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
-            color: #666;
-        }
-
-        .tab-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .tab-btn:hover:not(.active) {
-            background: #f0f0f0;
+        .report-options .info-text {
+            color: #888;
+            font-size: 0.85em;
+            margin-left: auto;
         }
 
         .transactions-table {
@@ -419,6 +442,23 @@
                 align-items: flex-start;
             }
 
+            .report-options .radio-group {
+                border-right: none;
+                border-bottom: 2px solid #e0e0e0;
+                padding-right: 0;
+                padding-bottom: 10px;
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .report-options .checkbox-group {
+                width: 100%;
+            }
+
+            .report-options .info-text {
+                margin-left: 0;
+            }
+
             .fecha-rapida {
                 min-width: 100%;
             }
@@ -452,8 +492,9 @@
                 <div class="sub-value" id="totalRecibidasCount">- transacciones</div>
             </div>
             <div class="stat-card balance">
-                <h3>💰 Balance</h3>
+                <h3>💰 Total General</h3>
                 <div class="value" id="balance">-</div>
+                <div class="sub-value" id="balanceLabel">-</div>
             </div>
             <div class="stat-card pendientes">
                 <h3>⏳ Pendientes</h3>
@@ -477,24 +518,43 @@
             </button>
         </div>
 
-        <!-- Opciones de reporte con checkboxes - TODOS DESACTIVADOS POR DEFAULT -->
+        <!-- Opciones de reporte con radio buttons y checkboxes -->
         <div class="report-options">
-            <span class="title">📋 Opciones de subtotales:</span>
-            <label>
-                <input type="checkbox" id="chkTipo" onchange="aplicarFiltros()">
-                📊 Por Tipo (Enviadas/Recibidas)
-            </label>
-            <label>
-                <input type="checkbox" id="chkOrdenante" onchange="aplicarFiltros()">
-                📤 Por Ordenante
-            </label>
-            <label>
-                <input type="checkbox" id="chkBeneficiario" onchange="aplicarFiltros()">
-                📥 Por Beneficiario
-            </label>
-            <span style="color: #888; font-size: 0.85em; margin-left: auto;">
-                ⚡ Los cambios se aplican automáticamente
-            </span>
+            <span class="title">📋 Opciones:</span>
+            
+            <!-- RADIO BUTTONS - TIPO DE TRANSACCIÓN -->
+            <div class="radio-group">
+                <span style="font-weight:600;color:#555;font-size:0.9em;">Tipo:</span>
+                <label class="label-todas">
+                    <input type="radio" name="tipoTransaccion" value="todas" checked onchange="aplicarFiltros()">
+                    📋 Todas
+                </label>
+                <label class="label-enviadas">
+                    <input type="radio" name="tipoTransaccion" value="enviadas" onchange="aplicarFiltros()">
+                    📤 Enviadas
+                </label>
+                <label class="label-recibidas">
+                    <input type="radio" name="tipoTransaccion" value="recibidas" onchange="aplicarFiltros()">
+                    📥 Recibidas
+                </label>
+            </div>
+            
+            <!-- CHECKBOXES - AGRUPACIONES -->
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="chkTipo" onchange="aplicarFiltros()">
+                    📊 Por Tipo
+                </label>
+                <label>
+                    <input type="checkbox" id="chkOrdenante" onchange="aplicarFiltros()">
+                    📤 Por Ordenante
+                </label>
+                <label>
+                    <input type="checkbox" id="chkBeneficiario" onchange="aplicarFiltros()">
+                    📥 Por Beneficiario
+                </label>
+            </div>
+            <span class="info-text">⚡ Los cambios se aplican automáticamente</span>
         </div>
 
         <!-- Filtros -->
@@ -540,20 +600,13 @@
                     <label>📌 Estado</label>
                     <select id="filtroEstado">
                         <option value="">Todos</option>
-                        <option value="PENDIENTE">⏳ Pendientes</option>
-                        <option value="CONFIRMADA">✅ Confirmadas</option>
+                        <option value="pendiente">⏳ Pendientes</option>
+                        <option value="confirmada">✅ Confirmadas</option>
                     </select>
                 </div>
                 <button class="btn-filter" onclick="aplicarFiltros()">🔍 Aplicar Filtros</button>
                 <button class="btn-filter" onclick="limpiarFiltros()">🗑️ Limpiar</button>
             </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab-btn active" onclick="cambiarTab('todas')">📋 Todas</button>
-            <button class="tab-btn" onclick="cambiarTab('enviadas')">📤 Enviadas</button>
-            <button class="tab-btn" onclick="cambiarTab('recibidas')">📥 Recibidas</button>
         </div>
 
         <!-- Tabla de transacciones -->
@@ -765,6 +818,9 @@
                 const banco = document.getElementById('filtroBanco')?.value?.toLowerCase() || '';
                 const moneda = document.getElementById('filtroMoneda')?.value || '';
                 const estado = document.getElementById('filtroEstado')?.value || '';
+                
+                // ===== OBTENER EL TIPO DE TRANSACCIÓN DEL RADIO BUTTON =====
+                const tipoSeleccionado = document.querySelector('input[name="tipoTransaccion"]:checked')?.value || 'todas';
 
                 const fechaInicio = normalizarFecha(fechaInicioStr);
                 const fechaFin = normalizarFecha(fechaFinStr);
@@ -776,8 +832,13 @@
                     if (banco && !(t.ordenante?.toLowerCase().includes(banco) || t.beneficiario?.toLowerCase().includes(banco))) return false;
                     if (moneda && t.moneda !== moneda) return false;
                     if (estado && t.estado !== estado) return false;
-                    if (tabActual === 'enviadas' && t.tipo !== 'enviada') return false;
-                    if (tabActual === 'recibidas' && t.tipo !== 'recibida') return false;
+                    
+                    // ===== FILTRAR POR TIPO DE TRANSACCIÓN (SOLO SI NO ES "TODAS") =====
+                    if (tipoSeleccionado !== 'todas') {
+                        if (tipoSeleccionado === 'enviadas' && t.tipo !== 'enviada') return false;
+                        if (tipoSeleccionado === 'recibidas' && t.tipo !== 'recibida') return false;
+                    }
+                    
                     return true;
                 });
 
@@ -793,21 +854,66 @@
             }
         }
 
-        // ========== ESTADÍSTICAS ==========
+        // ========== ESTADÍSTICAS CORREGIDAS ==========
         function actualizarEstadisticas() {
+            console.log('📊 ===== ACTUALIZANDO ESTADÍSTICAS =====');
+            
+            if (!transaccionesFiltradas || transaccionesFiltradas.length === 0) {
+                document.getElementById('pendientes').textContent = '0';
+                document.getElementById('confirmadas').textContent = '0';
+                document.getElementById('pendientesMonto').textContent = 'Monto: 0.00';
+                document.getElementById('confirmadasMonto').textContent = 'Monto: 0.00';
+                document.getElementById('totalEnviadas').textContent = '0.00';
+                document.getElementById('totalRecibidas').textContent = '0.00';
+                document.getElementById('balance').textContent = '0.00';
+                document.getElementById('balanceLabel').textContent = 'Total General';
+                document.getElementById('totalEnviadasCount').textContent = '0 transacciones';
+                document.getElementById('totalRecibidasCount').textContent = '0 transacciones';
+                return;
+            }
+            
+            // Obtener el tipo seleccionado
+            const tipoSeleccionado = document.querySelector('input[name="tipoTransaccion"]:checked')?.value || 'todas';
+            let tipoLabel = 'Total General';
+            if (tipoSeleccionado === 'enviadas') tipoLabel = '📤 Enviadas';
+            else if (tipoSeleccionado === 'recibidas') tipoLabel = '📥 Recibidas';
+            else tipoLabel = '📋 Todas';
+            
+            // Filtrar por tipo
             const enviadas = transaccionesFiltradas.filter(t => t.tipo === 'enviada');
             const recibidas = transaccionesFiltradas.filter(t => t.tipo === 'recibida');
+            
+            // Calcular totales
+            const totalEnviadas = enviadas.reduce((sum, t) => sum + Number(t.monto || 0), 0);
+            const totalRecibidas = recibidas.reduce((sum, t) => sum + Number(t.monto || 0), 0);
+            
+            // Para pendientes y confirmadas (usando minúsculas)
             const pendientes = transaccionesFiltradas.filter(t => t.estado === 'pendiente');
             const confirmadas = transaccionesFiltradas.filter(t => t.estado === 'confirmada');
             
-            const totalEnviadas = enviadas.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const totalRecibidas = recibidas.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const totalPendientes = pendientes.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const totalConfirmadas = confirmadas.reduce((sum, t) => sum + (t.monto || 0), 0);
-
+            const totalPendientes = pendientes.reduce((sum, t) => sum + Number(t.monto || 0), 0);
+            const totalConfirmadas = confirmadas.reduce((sum, t) => sum + Number(t.monto || 0), 0);
+            
+            // El balance depende del tipo seleccionado
+            let totalGeneral = 0;
+            if (tipoSeleccionado === 'todas') {
+                totalGeneral = totalEnviadas + totalRecibidas;
+            } else if (tipoSeleccionado === 'enviadas') {
+                totalGeneral = totalEnviadas;
+            } else {
+                totalGeneral = totalRecibidas;
+            }
+            
+            console.log('📊 Tipo seleccionado:', tipoLabel);
+            console.log('📊 Total General:', totalGeneral.toFixed(2));
+            console.log('📊 Pendientes:', pendientes.length, 'Monto:', totalPendientes.toFixed(2));
+            console.log('📊 Confirmadas:', confirmadas.length, 'Monto:', totalConfirmadas.toFixed(2));
+            
+            // Actualizar DOM
             document.getElementById('totalEnviadas').textContent = totalEnviadas.toFixed(2);
             document.getElementById('totalRecibidas').textContent = totalRecibidas.toFixed(2);
-            document.getElementById('balance').textContent = (totalRecibidas - totalEnviadas).toFixed(2);
+            document.getElementById('balance').textContent = totalGeneral.toFixed(2);
+            document.getElementById('balanceLabel').textContent = `Total ${tipoLabel}`;
             
             document.getElementById('pendientes').textContent = pendientes.length;
             document.getElementById('confirmadas').textContent = confirmadas.length;
@@ -816,6 +922,8 @@
             document.getElementById('totalRecibidasCount').textContent = `${recibidas.length} transacciones`;
             document.getElementById('pendientesMonto').textContent = `Monto: ${totalPendientes.toFixed(2)}`;
             document.getElementById('confirmadasMonto').textContent = `Monto: ${totalConfirmadas.toFixed(2)}`;
+            
+            console.log('📊 ===== FIN ACTUALIZACIÓN =====');
         }
 
         // ========== RENDERIZAR TABLA ==========
@@ -830,7 +938,17 @@
             const mostrarOrdenante = document.getElementById('chkOrdenante').checked;
             const mostrarBeneficiario = document.getElementById('chkBeneficiario').checked;
 
-            let html = '<table class="transactions-table" style="width:100%; border-collapse: collapse;">';
+            // Obtener el tipo seleccionado para el título
+            const tipoSeleccionado = document.querySelector('input[name="tipoTransaccion"]:checked')?.value || 'todas';
+            let tipoLabel = 'Todas';
+            if (tipoSeleccionado === 'enviadas') tipoLabel = '📤 Enviadas';
+            else if (tipoSeleccionado === 'recibidas') tipoLabel = '📥 Recibidas';
+            else tipoLabel = '📋 Todas';
+
+            let html = `<div style="padding:10px 15px;background:#f8f9fa;border-bottom:2px solid #667eea;font-weight:600;color:#333;">
+                📊 Mostrando: ${tipoLabel} - Total: ${transaccionesFiltradas.length} transacciones
+            </div>`;
+            html += '<table class="transactions-table" style="width:100%; border-collapse: collapse;">';
             html += '<thead><tr>';
             html += '<th>Fecha</th><th>N° Transacción</th><th>Tipo</th><th>Beneficiario</th><th>Ordenante</th><th>Monto</th><th>Moneda</th><th>Estado</th><th>Fecha Confirmación</th>';
             html += '</tr></thead><tbody>';
@@ -839,11 +957,11 @@
 
             if (!mostrarTipo && !mostrarOrdenante && !mostrarBeneficiario) {
                 for (const t of transaccionesFiltradas) {
-                    const monto = t.monto || 0;
+                    const monto = Number(t.monto || 0);
                     totalGeneral += monto;
                     html += generarFilaTransaccion(t);
                 }
-                html += generarFilaTotal(totalGeneral);
+                html += generarFilaTotal(totalGeneral, tipoLabel);
                 html += '</tbody></table>';
                 container.innerHTML = html;
                 return;
@@ -857,7 +975,7 @@
             function agrupar(items, nivel) {
                 if (items.length === 0 || nivel >= ordenAgrupacion.length) {
                     for (const t of items) {
-                        const monto = t.monto || 0;
+                        const monto = Number(t.monto || 0);
                         totalGeneral += monto;
                         html += generarFilaTransaccion(t);
                     }
@@ -883,7 +1001,7 @@
                 const keysOrdenadas = Object.keys(grupos).sort();
                 for (const key of keysOrdenadas) {
                     const grupoItems = grupos[key];
-                    const subtotal = grupoItems.reduce((sum, t) => sum + (t.monto || 0), 0);
+                    const subtotal = grupoItems.reduce((sum, t) => sum + Number(t.monto || 0), 0);
                     
                     let label = key;
                     if (tipoActual === 'ordenante') label = `📤 ${key}`;
@@ -903,15 +1021,15 @@
 
             agrupar(transaccionesFiltradas, 0);
 
-            html += generarFilaTotal(totalGeneral);
+            html += generarFilaTotal(totalGeneral, tipoLabel);
             html += '</tbody></table>';
             container.innerHTML = html;
         }
 
         function generarFilaTransaccion(t) {
-            const monto = t.monto || 0;
+            const monto = Number(t.monto || 0);
             const tipoClass = t.tipo === 'enviada' ? 'badge-enviada' : 'badge-recibida';
-            const estadoClass = t.estado === 'PENDIENTE' ? 'badge-pendiente' : 'badge-confirmada';
+            const estadoClass = t.estado === 'pendiente' ? 'badge-pendiente' : 'badge-confirmada';
             let fechaConfirm = '-';
             if (t.fecha_confirmacion) {
                 fechaConfirm = new Date(t.fecha_confirmacion).toLocaleString();
@@ -924,14 +1042,14 @@
                 <td>${t.ordenante || '-'}</td>
                 <td><strong>${monto.toFixed(2)}</strong></td>
                 <td>${t.moneda}</td>
-                <td><span class="badge ${estadoClass}">${t.estado}</span></td>
+                <td><span class="badge ${estadoClass}">${t.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Confirmada'}</span></td>
                 <td>${fechaConfirm}</td>
             </tr>`;
         }
 
-        function generarFilaTotal(total) {
+        function generarFilaTotal(total, tipoLabel) {
             return `<tr class="subtotal-row" style="background-color: #e8edff;">
-                <td colspan="3" style="text-align: right; font-size: 1.1em;">💰 TOTAL GENERAL:</td>
+                <td colspan="3" style="text-align: right; font-size: 1.1em;">💰 TOTAL ${tipoLabel.toUpperCase()}:</td>
                 <td></td>
                 <td></td>
                 <td style="font-size: 1.1em;"><strong>${total.toFixed(2)}</strong></td>
@@ -939,17 +1057,7 @@
             </tr>`;
         }
 
-        // ========== CAMBIAR PESTAÑA ==========
-        function cambiarTab(tab) {
-            tabActual = tab;
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            const btns = document.querySelectorAll('.tab-btn');
-            if (tab === 'todas') btns[0].classList.add('active');
-            else if (tab === 'enviadas') btns[1].classList.add('active');
-            else if (tab === 'recibidas') btns[2].classList.add('active');
-            aplicarFiltros();
-        }
-
+        // ========== LIMPIAR FILTROS ==========
         function limpiarFiltros() {
             document.getElementById('fechaInicio').value = '';
             document.getElementById('fechaFin').value = '';
@@ -961,11 +1069,16 @@
         }
 
         // ========== EXPORTAR A EXCEL ==========
-        async function exportarExcel() {
+       async function exportarExcel() {
             if (!transaccionesFiltradas.length) {
                 mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
                 return;
             }
+
+            const tipoSeleccionado = document.querySelector('input[name="tipoTransaccion"]:checked')?.value || 'todas';
+            let tipoLabel = 'Todas';
+            if (tipoSeleccionado === 'enviadas') tipoLabel = 'Enviadas';
+            else if (tipoSeleccionado === 'recibidas') tipoLabel = 'Recibidas';
 
             const datos = transaccionesFiltradas.map(t => ({
                 'Fecha': t.fecha || '',
@@ -973,7 +1086,7 @@
                 'Tipo': t.tipo === 'enviada' ? 'Enviada' : 'Recibida',
                 'Beneficiario': t.beneficiario || '',
                 'Ordenante': t.ordenante || '',
-                'Monto': (t.monto || 0).toFixed(2),
+                'Monto': Number(t.monto || 0).toFixed(2),
                 'Moneda': t.moneda || '',
                 'Estado': t.estado || '',
                 'Fecha Confirmación': t.fecha_confirmacion ? new Date(t.fecha_confirmacion).toLocaleString() : ''
@@ -986,65 +1099,116 @@
             ws['!cols'] = wscols;
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
-            XLSX.writeFile(wb, `transacciones_${new Date().toISOString().slice(0,19)}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, `Transacciones ${tipoLabel}`);
+            XLSX.writeFile(wb, `transacciones_${tipoSeleccionado}_${new Date().toISOString().slice(0,19)}.xlsx`);
             mostrarMensajeTemporal('✅ Excel exportado correctamente', 'success');
         }
-
-        // ========== EXPORTAR A PDF (VERSIÓN QUE FUNCIONA CON FIRMA) ==========
+        // ========== EXPORTAR A PDF - VERSIÓN CORREGIDA ==========// ========== EXPORTAR A PDF - VERSIÓN FINAL CORREGIDA ==========
+        // ========== EXPORTAR A PDF - VERSIÓN DEFINITIVA ==========
         async function exportarPDF() {
             if (!transaccionesFiltradas.length) {
                 mostrarMensajeTemporal('⚠️ No hay datos para exportar', 'error');
                 return;
             }
 
+            // ===== OBTENER EL TIPO SELECCIONADO =====
+            const tipoSeleccionado = document.querySelector('input[name="tipoTransaccion"]:checked')?.value || 'todas';
+            let tipoLabel = '📋 Todas';
+            if (tipoSeleccionado === 'enviadas') tipoLabel = '📤 Enviadas';
+            else if (tipoSeleccionado === 'recibidas') tipoLabel = '📥 Recibidas';
+
             const mostrarTipo = document.getElementById('chkTipo').checked;
             const mostrarOrdenante = document.getElementById('chkOrdenante').checked;
             const mostrarBeneficiario = document.getElementById('chkBeneficiario').checked;
 
+            // ===== OBTENER PERÍODO =====
             let fechaInicioRaw = document.getElementById('fechaInicio')?.value || '';
             let fechaFinRaw = document.getElementById('fechaFin')?.value || '';
-            const rangoTexto = (fechaInicioRaw && fechaFinRaw) 
-                ? `${fechaInicioRaw} - ${fechaFinRaw}`
-                : (fechaInicioRaw ? `Desde ${fechaInicioRaw}` : (fechaFinRaw ? `Hasta ${fechaFinRaw}` : 'Todos los períodos'));
 
-            const totalMonto = transaccionesFiltradas.reduce((sum, t) => sum + (t.monto || 0), 0);
+            let periodoTexto = '';
+            if (fechaInicioRaw && fechaFinRaw) {
+                periodoTexto = `${fechaInicioRaw} - ${fechaFinRaw}`;
+            } else if (fechaInicioRaw) {
+                periodoTexto = `Desde ${fechaInicioRaw}`;
+            } else if (fechaFinRaw) {
+                periodoTexto = `Hasta ${fechaFinRaw}`;
+            } else {
+                periodoTexto = 'Todos los períodos';
+            }
+
+            // ===== OBTENER AGRUPACIONES ACTIVAS =====
+            let agrupacionesActivas = [];
+            if (mostrarTipo) agrupacionesActivas.push('Por Tipo');
+            if (mostrarOrdenante) agrupacionesActivas.push('Por Ordenante');
+            if (mostrarBeneficiario) agrupacionesActivas.push('Por Beneficiario');
+
+            let agrupacionesTexto = agrupacionesActivas.length > 0 
+                ? agrupacionesActivas.join(' + ') 
+                : 'Sin agrupación';
+
+            // Calcular totales
+            const totalMonto = transaccionesFiltradas.reduce((sum, t) => sum + Number(t.monto || 0), 0);
             const pendientes = transaccionesFiltradas.filter(t => t.estado === 'pendiente');
             const confirmadas = transaccionesFiltradas.filter(t => t.estado === 'confirmada');
-            //console.log("Las pendientes son  ",pendientes.lenght())
-            const montoPendientes = pendientes.reduce((sum, t) => sum + (t.monto || 0), 0);
-            const montoConfirmadas = confirmadas.reduce((sum, t) => sum + (t.monto || 0), 0);
+            
+            const montoPendientes = pendientes.reduce((sum, t) => sum + Number(t.monto || 0), 0);
+            const montoConfirmadas = confirmadas.reduce((sum, t) => sum + Number(t.monto || 0), 0);
 
-            // Obtener nombre del usuario para la firma
             const usuarioNombre = user ? `${user.nombre} ${user.apellido}` : 'Usuario';
+            const fechaActual = new Date().toLocaleDateString();
 
-            // Crear contenido para PDF
+            // ===== CREAR CONTENIDO PARA PDF =====
             let htmlContent = `
-                <div style="padding:20px;font-family:Arial,sans-serif;font-size:11px;background:white;">
-                    <h2 style="text-align:center;color:#1e3c72;margin:0 0 10px 0;font-size:18px;font-weight:bold;">
-                        Reporte de Transacciones - ${rangoTexto}
-                    </h2>
-                    <p style="text-align:center;margin-bottom:15px;font-size:12px;">
-                        Generado el: ${new Date().toLocaleString()}
-                    </p>
-                    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;background:#f0f0f0;padding:10px;border-radius:8px;margin-bottom:20px;font-size:11px;">
-                        <div><strong>📊 Total transacciones:</strong> ${transaccionesFiltradas.length}</div>
-                        <div><strong>💰 Monto total:</strong> ${totalMonto.toFixed(2)}</div>
-                        <div><strong>⏳ Pendientes:</strong> ${pendientes.length} (Monto: ${montoPendientes.toFixed(2)})</div>
-                        <div><strong>✅ Confirmadas:</strong> ${confirmadas.length} (Monto: ${montoConfirmadas.toFixed(2)})</div>
+                <div style="padding:20px 25px;font-family:Arial,sans-serif;font-size:11px;background:white;width:1100px;margin:0;border:0;">
+                    
+                    <!-- ENCABEZADO -->
+                    <div style="text-align:center;margin-bottom:18px;">
+                        <h2 style="color:#1e3c72;margin:0 0 5px 0;font-size:20px;font-weight:bold;">
+                            Reporte de Transacciones
+                        </h2>
+                        <h3 style="color:#555;margin:0 0 3px 0;font-size:15px;font-weight:normal;">
+                            ${tipoLabel} - ${periodoTexto}
+                        </h3>
+                        <p style="color:#888;margin:0 0 8px 0;font-size:12px;">
+                            📊 Agrupado por: ${agrupacionesTexto}
+                        </p>
+                        <p style="margin:0;font-size:11px;color:#666;">
+                            Generado el: ${new Date().toLocaleString()}
+                        </p>
                     </div>
-                    <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;font-size:10px;">
+
+                    <!-- RESUMEN -->
+                    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;background:#f0f0f0;padding:10px 15px;border-radius:6px;margin-bottom:18px;font-size:12px;">
+                        <div><strong>📊 Total:</strong> ${transaccionesFiltradas.length}</div>
+                        <div><strong>💰 Total ${tipoLabel}:</strong> ${totalMonto.toFixed(2)}</div>
+                        <div><strong>⏳ Pendientes:</strong> ${pendientes.length} (${montoPendientes.toFixed(2)})</div>
+                        <div><strong>✅ Confirmadas:</strong> ${confirmadas.length} (${montoConfirmadas.toFixed(2)})</div>
+                    </div>
+
+                    <!-- TABLA -->
+                    <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;font-size:10px;table-layout:fixed;">
+                        <colgroup>
+                            <col style="width:11%;">
+                            <col style="width:13%;">
+                            <col style="width:9%;">
+                            <col style="width:15%;">
+                            <col style="width:15%;">
+                            <col style="width:10%;">
+                            <col style="width:7%;">
+                            <col style="width:10%;">
+                            <col style="width:10%;">
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Fecha</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">N° Transacción</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Tipo</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Beneficiario</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Ordenante</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Monto</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Moneda</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Estado</th>
-                                <th style="border:1px solid #ddd;padding:6px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Fecha Confirmación</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Fecha</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">N° Transacción</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Tipo</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Beneficiario</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Ordenante</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:right;font-weight:bold;font-size:10px;">Monto</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Moneda</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Estado</th>
+                                <th style="border:1px solid #ddd;padding:6px 4px;background:#f2f2f2;text-align:left;font-weight:bold;font-size:10px;">Fecha Confirmación</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1052,24 +1216,24 @@
 
             function agregarFilaHTML(t) {
                 const fechaConfirm = t.fecha_confirmacion ? new Date(t.fecha_confirmacion).toLocaleString() : '-';
-                return `<tr>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${t.fecha || ''}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${t.numero_transaccion || '-'}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${t.tipo === 'enviada' ? 'Enviada' : 'Recibida'}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${t.beneficiario || '-'}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${t.ordenante || '-'}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${(t.monto || 0).toFixed(2)}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${t.moneda || ''}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${t.estado || ''}</td>
-                    <td style="border:1px solid #ddd;padding:5px;font-size:9px;">${fechaConfirm}</td>
+                return `<tr style="page-break-inside:avoid;">
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${t.fecha || ''}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${t.numero_transaccion || '-'}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${t.tipo === 'enviada' ? 'Enviada' : 'Recibida'}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${t.beneficiario || '-'}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${t.ordenante || '-'}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;text-align:right;">${Number(t.monto || 0).toFixed(2)}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${t.moneda || ''}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${t.estado || ''}</td>
+                    <td style="border:1px solid #ddd;padding:5px 4px;font-size:9px;">${fechaConfirm}</td>
                 </tr>`;
             }
 
             function agregarSubtotalHTML(label, monto) {
-                return `<tr style="background-color:#f0f4ff;font-weight:bold;">
-                    <td colspan="5" style="background-color:#f0f4ff;font-weight:bold;border:1px solid #ddd;padding:5px;text-align:right;font-size:10px;">📊 ${label}:</td>
-                    <td style="background-color:#f0f4ff;font-weight:bold;border:1px solid #ddd;padding:5px;font-size:10px;">${monto.toFixed(2)}</td>
-                    <td colspan="3" style="background-color:#f0f4ff;font-weight:bold;border:1px solid #ddd;padding:5px;"></td>
+                return `<tr style="background-color:#f0f4ff;font-weight:bold;page-break-inside:avoid;">
+                    <td colspan="5" style="background-color:#f0f4ff;font-weight:bold;border:1px solid #ddd;padding:5px 4px;text-align:right;font-size:10px;">📊 ${label}:</td>
+                    <td style="background-color:#f0f4ff;font-weight:bold;border:1px solid #ddd;padding:5px 4px;font-size:10px;text-align:right;">${monto.toFixed(2)}</td>
+                    <td colspan="3" style="background-color:#f0f4ff;font-weight:bold;border:1px solid #ddd;padding:5px 4px;"></td>
                 </tr>`;
             }
 
@@ -1110,7 +1274,7 @@
                     const keysOrdenadas = Object.keys(grupos).sort();
                     for (const key of keysOrdenadas) {
                         const grupoItems = grupos[key];
-                        const subtotal = grupoItems.reduce((sum, t) => sum + (t.monto || 0), 0);
+                        const subtotal = grupoItems.reduce((sum, t) => sum + Number(t.monto || 0), 0);
                         
                         let label = key;
                         if (tipoActual === 'ordenante') label = `📤 ${key}`;
@@ -1124,42 +1288,83 @@
                 procesarGrupos(transaccionesFiltradas, 0);
             }
 
+            // ===== TOTAL GENERAL =====
             htmlContent += `
-                        <tr style="background-color:#e8edff;font-weight:bold;">
-                            <td colspan="5" style="background-color:#e8edff;font-weight:bold;border:1px solid #ddd;padding:5px;text-align:right;font-size:12px;">💰 TOTAL GENERAL:</td>
-                            <td style="background-color:#e8edff;font-weight:bold;border:1px solid #ddd;padding:5px;font-size:12px;">${totalMonto.toFixed(2)}</td>
-                            <td colspan="3" style="background-color:#e8edff;font-weight:bold;border:1px solid #ddd;padding:5px;"></td>
+                        <tr style="background-color:#e8edff;font-weight:bold;page-break-inside:avoid;">
+                            <td colspan="5" style="background-color:#e8edff;font-weight:bold;border:1px solid #ddd;padding:6px 4px;text-align:right;font-size:13px;">💰 TOTAL ${tipoLabel.toUpperCase()}:</td>
+                            <td style="background-color:#e8edff;font-weight:bold;border:1px solid #ddd;padding:6px 4px;font-size:13px;text-align:right;">${totalMonto.toFixed(2)}</td>
+                            <td colspan="3" style="background-color:#e8edff;font-weight:bold;border:1px solid #ddd;padding:6px 4px;"></td>
                         </tr>
                     </tbody>
                 </table>
             `;
 
-            // FIRMA DEL USUARIO
+            // ===== FIRMA Y PIE DE PÁGINA =====
             htmlContent += `
-                        <div style="margin-top:30px;text-align:right;font-style:italic;border-top:1px solid #ccc;padding-top:10px;">
-                            <p style="margin:5px 0;">Firma: ___________________________</p>
-                            <p style="margin:5px 0;font-weight:bold;">${usuarioNombre}</p>
-                            <p style="margin:5px 0;">${new Date().toLocaleDateString()}</p>
+                <div style="margin-top:50px;border-top:2px solid #333;padding-top:25px;page-break-inside:avoid;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+                        <div style="text-align:left;font-size:11px;color:#666;">
+                            <p style="margin:4px 0;">Este documento es un reporte oficial de transacciones</p>
+                            <p style="margin:4px 0;">generado por el sistema bancario.</p>
+                            <p style="margin:4px 0;font-size:10px;color:#999;">Fecha de generación: ${new Date().toLocaleString()}</p>
+                        </div>
+                        <div style="text-align:right;">
+                            <p style="margin:4px 0;font-size:13px;">
+                                <span style="font-weight:bold;">Firma:</span> ___________________________ 
+                            </p>
+                            <p style="margin:4px 0;font-size:13px;font-weight:bold;color:#1e3c72;">
+                                ${usuarioNombre}
+                            </p>
+                            <p style="margin:4px 0;font-size:12px;color:#666;">
+                                ${fechaActual}
+                            </p>
                         </div>
                     </div>
+                </div>
+            `;
+
+            htmlContent += `
                 </div>
             `;
 
             // Crear elemento temporal para el PDF
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = htmlContent;
+            tempDiv.style.cssText = 'width:1100px;background:white;padding:0;margin:0;border:0;';
             document.body.appendChild(tempDiv);
 
-            // Configuración para html2pdf
+            // Esperar a que el DOM se actualice
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            // Configuración optimizada para PDF - CON PAGEBREAK
             const opt = {
-                margin:        [0.5, 0.5, 0.5, 0.5],
-                filename:     `transacciones_${new Date().toISOString().slice(0,19)}.pdf`,
+                margin:        [0.3, 0.3, 0.3, 0.3],
+                filename:     `transacciones_${tipoSeleccionado}_${new Date().toISOString().slice(0,19)}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, logging: false },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+                html2canvas:  { 
+                    scale: 2.5,
+                    useCORS: true, 
+                    logging: false,
+                    width: 1100,
+                    height: tempDiv.scrollHeight || 1000,
+                    windowWidth: 1100,
+                    windowHeight: tempDiv.scrollHeight || 1000,
+                    x: 0,
+                    y: 0
+                },
+                jsPDF:        { 
+                    unit: 'in', 
+                    format: 'a4', 
+                    orientation: 'landscape' 
+                },
+                pagebreak:    { 
+                    mode: ['avoid-all', 'css', 'legacy'],
+                    after: '.page-break-after'
+                }
             };
 
             try {
+                // Generar PDF
                 await html2pdf().set(opt).from(tempDiv).save();
                 mostrarMensajeTemporal('📄 PDF exportado correctamente', 'success');
             } catch (error) {
@@ -1171,7 +1376,6 @@
                 }
             }
         }
-
         function mostrarMensajeTemporal(mensaje, tipo) {
             const msgDiv = document.createElement('div');
             msgDiv.textContent = mensaje;
