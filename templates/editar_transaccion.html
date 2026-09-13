@@ -110,7 +110,8 @@
             font-weight: 600;
         }
 
-        .filter-group input, .filter-group select {
+        .filter-group input,
+        .filter-group select {
             width: 100%;
             padding: 10px;
             border: 2px solid #e0e0e0;
@@ -145,7 +146,8 @@
             border-collapse: collapse;
         }
 
-        th, td {
+        th,
+        td {
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid #e0e0e0;
@@ -183,10 +185,22 @@
             font-weight: 600;
         }
 
-        .badge-pendiente { background: #feebc8; color: #c05621; }
-        .badge-confirmada { background: #c6f6d5; color: #22543d; }
-        .badge-enviada { background: #fed7d7; color: #c53030; }
-        .badge-recibida { background: #c6f6d5; color: #22543d; }
+        .badge-pendiente {
+            background: #feebc8;
+            color: #c05621;
+        }
+        .badge-confirmada {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        .badge-enviada {
+            background: #fed7d7;
+            color: #c53030;
+        }
+        .badge-recibida {
+            background: #c6f6d5;
+            color: #22543d;
+        }
 
         /* Modal */
         .modal {
@@ -196,7 +210,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             z-index: 1000;
             justify-content: center;
             align-items: center;
@@ -210,7 +224,7 @@
             background: white;
             border-radius: 15px;
             width: 90%;
-            max-width: 550px;
+            max-width: 600px;
             max-height: 90vh;
             overflow-y: auto;
             padding: 25px;
@@ -244,11 +258,21 @@
             color: #555;
         }
 
-        .form-group input, .form-group select, .form-group textarea {
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 10px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
+            font-size: 0.95em;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #667eea;
+            outline: none;
         }
 
         .form-row {
@@ -274,6 +298,15 @@
             font-weight: 600;
         }
 
+        .btn-save:hover {
+            background: #38a169;
+        }
+
+        .btn-save:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .btn-cancel {
             flex: 1;
             background: #a0aec0;
@@ -283,6 +316,22 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
+        }
+
+        .btn-cancel:hover {
+            background: #718096;
+        }
+
+        .readonly-field {
+            background: #f0f0f0;
+            cursor: not-allowed;
+        }
+
+        .helper-text {
+            color: #999;
+            font-size: 0.8em;
+            display: block;
+            margin-top: 5px;
         }
 
         .loading {
@@ -301,7 +350,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         .empty-message {
@@ -310,12 +361,161 @@
             color: #999;
         }
 
-        @media (max-width: 768px) {
-            .filters-row {
+        /* ========== INTERCAMBIO DE CUENTAS ========== */
+        .swap-container {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 2px dashed #cbd5e0;
+        }
+
+        .swap-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.85em;
+            padding: 0 5px;
+            margin-bottom: 10px;
+        }
+
+        .swap-label span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .swap-arrows {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .swap-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .swap-btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .swap-btn:active {
+            transform: scale(0.95);
+        }
+
+        .swap-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .swap-text {
+            font-size: 0.85em;
+        }
+
+        .swap-boxes {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .swap-box {
+            flex: 1;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.95em;
+            color: #2d3748;
+            transition: all 0.3s ease;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .swap-box.beneficiario-box {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+
+        .swap-box.ordenante-box {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+
+        .swap-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #667eea;
+            font-size: 1.5em;
+            font-weight: bold;
+            padding: 0 5px;
+            animation: pulse 2s infinite;
+        }
+
+        .swap-box .highlight {
+            animation: highlightFade 0.8s ease;
+        }
+
+        @keyframes pulse {
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes highlightFade {
+            0% {
+                background: #fbbf24;
+                transform: scale(1.05);
+            }
+            100% {
+                background: transparent;
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .swap-boxes {
                 flex-direction: column;
+            }
+            .swap-icon {
+                transform: rotate(90deg);
+            }
+            .swap-label {
+                flex-direction: column;
+                gap: 10px;
             }
             .form-row {
                 grid-template-columns: 1fr;
+            }
+            .filters-row {
+                flex-direction: column;
             }
         }
     </style>
@@ -383,7 +583,6 @@
     </div>
 
     <script>
-        //const BASE_URL = 'http://localhost:8000';
         const BASE_URL = window.location.origin;
         let token = null;
         let user = null;
@@ -455,10 +654,7 @@
                 params.append('skip', '0');
                 params.append('limit', '100');
 
-                const url = `${BASE_URL}/transacciones/buscar?${params.toString()}`;
-                console.log('📤 URL:', url);
-
-                const response = await fetch(url, {
+                const response = await fetch(`${BASE_URL}/transacciones/buscar?${params.toString()}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -468,10 +664,8 @@
                 }
 
                 const transacciones = await response.json();
-                console.log('📊 Transacciones recibidas:', transacciones.length);
-                
+
                 if (transacciones.length === 0) {
-                    // 👇 Mensaje más informativo
                     tableContainer.innerHTML = `
                         <div class="empty-message">
                             📭 No se encontraron transacciones para "<strong>${searchTerm}</strong>"<br><br>
@@ -495,11 +689,6 @@
 
         function mostrarResultados(transacciones) {
             const tableContainer = document.getElementById('tableContainer');
-
-            if (transacciones.length === 0) {
-                tableContainer.innerHTML = '<div class="empty-message">📭 No se encontraron transacciones</div>';
-                return;
-            }
 
             let html = `
                 <table>
@@ -567,13 +756,12 @@
                 }
 
                 transaccionActual = await response.json();
-                
-                // Verificar si el usuario tiene permiso para editar
+
                 if (transaccionActual.usuario_id !== user.id) {
                     alert('⚠️ Solo el usuario que creó la transacción puede editarla.\n\nSi necesitas modificarla, contacta al usuario que la procesó.');
                     return;
                 }
-                
+
                 mostrarFormularioEdicion();
 
             } catch (error) {
@@ -582,39 +770,129 @@
             }
         }
 
+        // ========== INTERCAMBIAR CUENTAS ==========
+        function intercambiarCuentas() {
+            const beneficiarioInput = document.getElementById('beneficiarioInput');
+            const ordenanteInput = document.getElementById('ordenanteInput');
+            const beneficiarioPreview = document.getElementById('beneficiarioPreview');
+            const ordenantePreview = document.getElementById('ordenantePreview');
+            const beneficiarioBox = document.getElementById('beneficiarioBox');
+            const ordenanteBox = document.getElementById('ordenanteBox');
+
+            if (beneficiarioInput && ordenanteInput) {
+                // Intercambiar valores de los inputs
+                const temp = beneficiarioInput.value;
+                beneficiarioInput.value = ordenanteInput.value;
+                ordenanteInput.value = temp;
+
+                // Actualizar previsualizaciones
+                beneficiarioPreview.textContent = beneficiarioInput.value || '—';
+                ordenantePreview.textContent = ordenanteInput.value || '—';
+
+                // Efecto visual de intercambio
+                beneficiarioBox.classList.add('highlight');
+                ordenanteBox.classList.add('highlight');
+
+                // Feedback en el botón
+                const btn = document.querySelector('.swap-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span class="swap-text">¡Intercambiado!</span>
+                `;
+                btn.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    beneficiarioBox.classList.remove('highlight');
+                    ordenanteBox.classList.remove('highlight');
+                }, 2000);
+            }
+        }
+
         function mostrarFormularioEdicion() {
             const modal = document.getElementById('editModal');
             const modalForm = document.getElementById('modalForm');
 
+            const tipoActual = transaccionActual.tipo || 'enviada';
+
             modalForm.innerHTML = `
                 <form id="editForm" onsubmit="guardarCambios(event)">
+                    <div class="form-group">
+                        <label>📌 Tipo de Transacción</label>
+                        <select name="tipo" id="tipoTransaccion">
+                            <option value="enviada" ${tipoActual === 'enviada' ? 'selected' : ''}>📤 Enviada</option>
+                            <option value="recibida" ${tipoActual === 'recibida' ? 'selected' : ''}>📥 Recibida</option>
+                        </select>
+                    </div>
+
+                    <!-- ========== INTERCAMBIO DE CUENTAS ========== -->
+                    <div class="swap-container">
+                        <div class="swap-label">
+                            <span>👤 Beneficiario</span>
+                            <div class="swap-arrows">
+                                <button type="button" class="swap-btn" onclick="intercambiarCuentas()" title="Intercambiar cuentas">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="17 1 21 5 17 9"></polyline>
+                                        <polyline points="7 23 3 19 7 15"></polyline>
+                                        <line x1="21" y1="5" x2="3" y2="5"></line>
+                                        <line x1="3" y1="19" x2="21" y2="19"></line>
+                                    </svg>
+                                    <span class="swap-text">Invertir</span>
+                                </button>
+                            </div>
+                            <span>👤 Ordenante</span>
+                        </div>
+                        <div class="swap-boxes">
+                            <div class="swap-box beneficiario-box" id="beneficiarioBox">
+                                <span id="beneficiarioPreview">${transaccionActual.beneficiario || '—'}</span>
+                            </div>
+                            <div class="swap-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M7 7l5-5 5 5"></path>
+                                    <path d="M17 17l-5 5-5-5"></path>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                    <line x1="12" y1="2" x2="12" y2="22"></line>
+                                </svg>
+                            </div>
+                            <div class="swap-box ordenante-box" id="ordenanteBox">
+                                <span id="ordenantePreview">${transaccionActual.ordenante || '—'}</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Fecha (DD/MM/YYYY)</label>
-                            <input type="text" name="fecha" value="${transaccionActual.fecha || ''}" required>
+                            <label>📅 Fecha (DD/MM/YYYY)</label>
+                            <input type="text" name="fecha" id="fechaInput" value="${transaccionActual.fecha || ''}" required>
                         </div>
                         <div class="form-group">
-                            <label>Banco</label>
+                            <label>🏦 Banco</label>
                             <input type="text" name="banco" value="${transaccionActual.banco || ''}" required>
                         </div>
                     </div>
+
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Beneficiario</label>
-                            <input type="text" name="beneficiario" value="${transaccionActual.beneficiario || ''}" required>
+                            <label>👤 Beneficiario</label>
+                            <input type="text" name="beneficiario" id="beneficiarioInput" value="${transaccionActual.beneficiario || ''}" required>
                         </div>
                         <div class="form-group">
-                            <label>Ordenante</label>
-                            <input type="text" name="ordenante" value="${transaccionActual.ordenante || ''}" required>
+                            <label>👤 Ordenante</label>
+                            <input type="text" name="ordenante" id="ordenanteInput" value="${transaccionActual.ordenante || ''}" required>
                         </div>
                     </div>
+
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Monto</label>
+                            <label>💰 Monto</label>
                             <input type="number" step="0.01" name="monto" value="${transaccionActual.monto}" required>
                         </div>
                         <div class="form-group">
-                            <label>Moneda</label>
+                            <label>💱 Moneda</label>
                             <select name="moneda">
                                 <option value="CUP" ${transaccionActual.moneda === 'CUP' ? 'selected' : ''}>CUP</option>
                                 <option value="USD" ${transaccionActual.moneda === 'USD' ? 'selected' : ''}>USD</option>
@@ -623,14 +901,18 @@
                             </select>
                         </div>
                     </div>
+
                     <div class="form-group">
-                        <label>Número de Transacción</label>
-                        <input type="text" name="numero_transaccion" value="${transaccionActual.numero_transaccion || ''}" required>
+                        <label>🔢 Número de Transacción</label>
+                        <input type="text" name="numero_transaccion" value="${transaccionActual.numero_transaccion || ''}" required readonly class="readonly-field">
+                        <span class="helper-text">⛔ El número de transacción no se puede modificar</span>
                     </div>
+
                     <div class="form-group">
-                        <label>Descripción</label>
+                        <label>📝 Descripción</label>
                         <textarea name="descripcion" rows="3">${transaccionActual.descripcion || ''}</textarea>
                     </div>
+
                     <div class="modal-buttons">
                         <button type="submit" class="btn-save">💾 Guardar Cambios</button>
                         <button type="button" class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
@@ -639,6 +921,13 @@
             `;
 
             modal.classList.add('visible');
+
+            // Inicializar Flatpickr para el campo de fecha
+            flatpickr("#fechaInput", {
+                dateFormat: "d/m/Y",
+                locale: "es",
+                allowInput: true
+            });
         }
 
         async function guardarCambios(event) {
@@ -652,7 +941,8 @@
                 monto: parseFloat(document.querySelector('[name="monto"]').value),
                 moneda: document.querySelector('[name="moneda"]').value,
                 numero_transaccion: document.querySelector('[name="numero_transaccion"]').value,
-                descripcion: document.querySelector('[name="descripcion"]').value
+                descripcion: document.querySelector('[name="descripcion"]').value,
+                tipo: document.querySelector('[name="tipo"]').value
             };
 
             if (datosActualizados.monto <= 0) {
@@ -703,7 +993,6 @@
             await getUserProfile();
             if (user) {
                 console.log('✅ Usuario autenticado:', user.email);
-                // No cargar transacciones automáticamente, esperar búsqueda del usuario
             }
         }
 

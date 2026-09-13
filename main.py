@@ -1487,7 +1487,7 @@ async def test_page(request: Request):
     """
     Página de prueba para el endpoint de transferencias
     """
-    return templates.TemplateResponse("login_simple.html", {"request": request})
+    return templates.TemplateResponse("login_2.html", {"request": request})
 
 @app.get("/capturar", response_class=HTMLResponse)
 async def capturar_page(request: Request):
