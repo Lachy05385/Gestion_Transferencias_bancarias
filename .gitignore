@@ -12,6 +12,8 @@ database_t.py
 cargar_CSV.py
 *.bak
 *.log
+landing.html
+landing2.html
 
 # ========================================
 # PYTHON CACHE (SIEMPRE IGNORAR)

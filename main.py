@@ -26,8 +26,8 @@ from app.models import EstadoTransaccion
 from app.auth import get_password_hash
 from app.auth import verify_password
 from crear_admin import crear_empresa_y_admin
-from app.routers import contratos 
-
+from app.routers import contratos
+from app.routers import stats
 
 # Crear tablas
 create_tables()
@@ -50,6 +50,7 @@ app.add_middleware(
 
 
 app.include_router(contratos.router)
+app.include_router(stats.router)
 
 
 #router = APIRouter(prefix="/admin", tags=["Administración"])
@@ -68,8 +69,11 @@ def read_root():
 
 @app.get("/landing", response_class=HTMLResponse)
 async def landing_page(request: Request):
-    return templates.TemplateResponse("landing.html", {"request": request})
+    return templates.TemplateResponse("landing3.html", {"request": request})
 
+@app.get("/ayuda", response_class=HTMLResponse)
+async def landing_page(request: Request):
+    return templates.TemplateResponse("ayuda.html", {"request": request})
 
 
 
