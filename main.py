@@ -564,6 +564,7 @@ def actualizar_transaccion(
     if update_data.get('estado') == "CONFIRMADA" and transaccion.estado != "CONFIRMADA":
         from datetime import datetime
         transaccion.fecha_confirmacion = datetime.now()
+        
         print(f"   📅 Fecha confirmación registrada: {transaccion.fecha_confirmacion}")
     
     # Si el estado cambió a PENDIENTE, limpiar fecha_confirmacion
@@ -1129,7 +1130,7 @@ async def confirmar_transacciones_page(request: Request):
 
 
 
-
+from fastapi import BackgroundTasks
 
 @app.post("/transacciones/{transaccion_id}/confirmar", response_model=schemas.TransaccionResponse)
 def confirmar_transaccion(
@@ -1145,6 +1146,8 @@ def confirmar_transaccion(
         usuario_id=current_user.id
     )
     
+    
+    print(".... CONFIRMANDO ---")    
 
     if transaccion is None:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")

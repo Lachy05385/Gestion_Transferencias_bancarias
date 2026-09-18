@@ -158,7 +158,7 @@ if IS_PRODUCTION:
                     f"{self.connection.url}/v2/pipeline",
                     headers=self.connection.headers,
                     json=payload,
-                    timeout=30
+                    timeout=60
                 )
                 
                 if response.status_code != 200:
