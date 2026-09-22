@@ -14,7 +14,7 @@ cargar_CSV.py
 *.log
 landing.html
 landing2.html
-
+crear_admin.py
 # ========================================
 # PYTHON CACHE (SIEMPRE IGNORAR)
 # ========================================
