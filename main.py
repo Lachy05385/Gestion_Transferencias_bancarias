@@ -485,6 +485,84 @@ async def login_for_access_token(
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
     }
 
+@app.get("/transacciones/buscar", response_model=List[schemas.TransaccionResponse])
+def buscar_transacciones(
+    q: str = Query(..., min_length=1, description="Término de búsqueda"),
+    tipo: Optional[str] = Query(None, description="Filtrar por tipo: enviada o recibida"),
+    current_user: models.Usuario = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Buscar transacciones del usuario actual.
+    IMPORTANTE: Solo se pueden buscar transacciones propias.
+    """
+    print(f"🔍 Búsqueda: '{q}', tipo: '{tipo}'")
+    print(f"👤 Usuario: {current_user.email} (ID: {current_user.id}, rol: {current_user.rol})")
+    
+    # Verificar si el usuario tiene transacciones en general
+    total_transacciones = db.query(models.Transaccion).filter(
+        models.Transaccion.usuario_id == current_user.id
+    ).count()
+    
+    print(f"📊 Total de transacciones del usuario: {total_transacciones}")
+    
+    if total_transacciones == 0:
+        print(f"⚠️ El usuario {current_user.email} no tiene transacciones registradas")
+        # Devolver lista vacía con información en el header (opcional)
+        # O simplemente devolver lista vacía
+        return []
+    
+    # Construir consulta base: SOLO transacciones del usuario actual
+    query = db.query(models.Transaccion).filter(
+        models.Transaccion.usuario_id == current_user.id
+    )
+    
+    # Aplicar filtro de tipo si existe
+    if tipo:
+        tipo_normalizado = tipo.lower().strip()
+        if tipo_normalizado in ['enviada', 'recibida']:
+            query = query.filter(models.Transaccion.tipo == tipo_normalizado)
+            print(f"   Filtro por tipo: {tipo_normalizado}")
+    
+    # Aplicar búsqueda por texto en varios campos
+    search_pattern = f"%{q}%"
+    query = query.filter(
+        (models.Transaccion.numero_transaccion.ilike(search_pattern)) |
+        (models.Transaccion.beneficiario.ilike(search_pattern)) |
+        (models.Transaccion.ordenante.ilike(search_pattern)) |
+        (models.Transaccion.banco.ilike(search_pattern)) |
+        (models.Transaccion.descripcion.ilike(search_pattern))
+    )
+    
+    # Ordenar y limitar
+    transacciones = query.order_by(
+        models.Transaccion.fecha.desc()
+    ).limit(50).all()
+    
+    print(f"📊 Transacciones encontradas con el filtro: {len(transacciones)}")
+    
+    if len(transacciones) == 0 and total_transacciones > 0:
+        print(f"⚠️ No se encontraron coincidencias para '{q}' en las transacciones del usuario")
+    
+    # Normalizar datos para evitar errores de validación
+    for t in transacciones:
+        if not t.banco or len(t.banco) < 2:
+            t.banco = "Banco no especificado"
+        if not t.beneficiario or len(t.beneficiario) < 4:
+            t.beneficiario = "XXXX"
+        if not t.ordenante or len(t.ordenante) < 4:
+            t.ordenante = "XXXX"
+        if t.descripcion is None:
+            t.descripcion = ""
+    
+    return transacciones
+
+
+
+
+
+
+
 
 
 #patch
