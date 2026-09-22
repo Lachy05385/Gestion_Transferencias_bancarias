@@ -1207,6 +1207,7 @@ async def confirmar_transacciones_page(request: Request):
 
 
 from fastapi import BackgroundTasks
+import traceback
 
 @app.post("/transacciones/{transaccion_id}/confirmar", response_model=schemas.TransaccionResponse)
 def confirmar_transaccion(
@@ -1214,20 +1215,42 @@ def confirmar_transaccion(
     current_user: models.Usuario = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
+    print("=" * 60)
+    print(f"🔍 CONFIRMAR TRANSACCIÓN ID: {transaccion_id}")
+    print(f"👤 Usuario: {current_user.email}")
+    print(f"   - id: {current_user.id}")
+    print(f"   - rol: {current_user.rol}")
+    print(f"   - empresa_id: {current_user.empresa_id}")
 
-    """Confirmar una transacción recibida"""
-    transaccion = crud.confirmar_transaccion(
-        db=db,
-        transaccion_id=transaccion_id,
-        usuario_id=current_user.id
-    )
-    
-    
-    #print(".... CONFIRMANDO ---")    
+    try:
+        print("📞 Llamando a crud.confirmar_transaccion...")
+        transaccion = crud.confirmar_transaccion(
+            db=db,
+            transaccion_id=transaccion_id,
+            usuario_id=current_user.id
+        )
+        print(f"📊 Resultado crud: {transaccion}")
+        print(f"   - tipo: {type(transaccion)}")
+        print(f"   - id: {getattr(transaccion, 'id', 'N/A')}")
 
-    if transaccion is None:
-        raise HTTPException(status_code=404, detail="Transacción no encontrada")
-    return transaccion
+        if transaccion is None:
+            print("❌ Transacción es None")
+            raise HTTPException(status_code=404, detail="Transacción no encontrada")
+
+        print("✅ Devolviendo transacción")
+        return transaccion
+
+    except HTTPException as he:
+        print(f"⚠️ HTTPException: {he.status_code} - {he.detail}")
+        raise
+    except Exception as e:
+        print("=" * 60)
+        print("❌❌❌ ERROR EN CONFIRMAR TRANSACCIÓN")
+        print(f"Tipo: {type(e).__name__}")
+        print(f"Mensaje: {str(e)}")
+        traceback.print_exc()
+        print("=" * 60)
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 #subir imagenes 
 
 @app.get("/subir-imagen", response_class=HTMLResponse)
