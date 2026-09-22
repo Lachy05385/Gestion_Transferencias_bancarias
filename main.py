@@ -64,12 +64,9 @@ def read_root():
         "documentacion": "/docs"
     }
 
-
-
-
 @app.get("/landing", response_class=HTMLResponse)
 async def landing_page(request: Request):
-    return templates.TemplateResponse("landing3.html", {"request": request})
+    return templates.TemplateResponse("landing3html", {"request": request})
 
 @app.get("/ayuda", response_class=HTMLResponse)
 async def landing_page(request: Request):
@@ -105,6 +102,7 @@ def crear_empresa(
     db.commit()
     db.refresh(nueva_empresa)
     return nueva_empresa
+
 
 @app.get("/empresas", response_model=List[schemas.EmpresaResponse])
 def listar_empresas(
@@ -1147,7 +1145,7 @@ def confirmar_transaccion(
     )
     
     
-    print(".... CONFIRMANDO ---")    
+    #print(".... CONFIRMANDO ---")    
 
     if transaccion is None:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
