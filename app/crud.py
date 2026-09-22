@@ -180,52 +180,62 @@ def update_transaccion(db: Session, transaccion_id: int, usuario_id: int, transa
         raise
 
 def confirmar_transaccion(db: Session, transaccion_id: int, usuario_id: int):
-    """
-    Confirmar una transacción recibida.
-    - El usuario debe ser el dueño, o un contador/admin de la misma empresa.
-    """
+    from sqlalchemy import update
     from sqlalchemy.orm import joinedload
 
-    # Buscar la transacción por ID
-    db_transaccion = db.query(models.Transaccion).options(
-        joinedload(models.Transaccion.usuario)
-    ).filter(models.Transaccion.id == transaccion_id).first()
+    print("=" * 60)
+    print(f"🔍 CONFIRMAR - transaccion_id={transaccion_id}, usuario_id={usuario_id}")
+
+    # 1. Verificar que la transacción existe
+    db_transaccion = db.query(models.Transaccion).filter(
+        models.Transaccion.id == transaccion_id
+    ).first()
 
     if not db_transaccion:
+        print(f"❌ NO existe transacción con id={transaccion_id}")
         return None
 
-    # Verificar permisos
+    print(f"✅ Transacción encontrada:")
+    print(f"   - id: {db_transaccion.id}")
+    print(f"   - estado: {repr(db_transaccion.estado)}")
+    print(f"   - usuario_id: {db_transaccion.usuario_id}")
+    print(f"   - empresa_id: {db_transaccion.empresa_id}")
+
+    # 2. Verificar permisos
     usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
     if not usuario:
+        print(f"❌ NO existe usuario con id={usuario_id}")
         return None
 
-    # Permitir si:
-    # 1. Es el dueño de la transacción, o
-    # 2. Es admin, o
-    # 3. Es contador de la misma empresa
-    es_dueno = db_transaccion.usuario_id == usuario_id
-    es_admin = usuario.rol == "admin"
-    es_contador_misma_empresa = (
-        usuario.rol == "contador"
-        and db_transaccion.empresa_id == usuario.empresa_id
-    )
+    print(f"✅ Usuario: {usuario.email}, rol={usuario.rol}, empresa_id={usuario.empresa_id}")
 
-    if not (es_dueno or es_admin or es_contador_misma_empresa):
-        raise HTTPException(
-            status_code=403,
-            detail="No tienes permisos para confirmar esta transacción"
+    # 3. Hacer UPDATE explícito
+    try:
+        stmt = (
+            update(models.Transaccion)
+            .where(models.Transaccion.id == transaccion_id)
+            .values(
+                estado="confirmada",
+                fecha_confirmacion=datetime.now()
+            )
         )
+        result = db.execute(stmt)
+        print(f"📊 UPDATE afectó {result.rowcount} filas")
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error en UPDATE: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
-    # Confirmar
-    db_transaccion.estado = models.EstadoTransaccion.CONFIRMADA
-    db_transaccion.fecha_confirmacion = datetime.now()
-    db.commit()
-    db.refresh(db_transaccion)
+    # 4. Recargar
+    db_transaccion = db.query(models.Transaccion).filter(
+        models.Transaccion.id == transaccion_id
+    ).first()
 
-    # Recargar con la relación usuario para que el schema no falle
-    db_transaccion = db.query(models.Transaccion).options(
-        joinedload(models.Transaccion.usuario)
-    ).filter(models.Transaccion.id == transaccion_id).first()
+    print(f"📊 Estado después del UPDATE: {repr(db_transaccion.estado)}")
+    print("=" * 60)
 
     return db_transaccion
 
