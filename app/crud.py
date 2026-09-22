@@ -181,19 +181,51 @@ def update_transaccion(db: Session, transaccion_id: int, usuario_id: int, transa
 
 def confirmar_transaccion(db: Session, transaccion_id: int, usuario_id: int):
     """
-    Confirmar una transacción recibida
+    Confirmar una transacción recibida.
+    - El usuario debe ser el dueño, o un contador/admin de la misma empresa.
     """
-    db_transaccion = get_transaccion(db, transaccion_id, usuario_id)
+    from sqlalchemy.orm import joinedload
+
+    # Buscar la transacción por ID
+    db_transaccion = db.query(models.Transaccion).options(
+        joinedload(models.Transaccion.usuario)
+    ).filter(models.Transaccion.id == transaccion_id).first()
+
     if not db_transaccion:
         return None
-    
-    # Solo se pueden confirmar transacciones RECIBIDAS
-    # ESTO LO DESACTIVE PARA PODER CONFIRMARLAS TODAS 
-    #if db_transaccion.tipo == models.TipoTransaccion.RECIBIDA:
+
+    # Verificar permisos
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        return None
+
+    # Permitir si:
+    # 1. Es el dueño de la transacción, o
+    # 2. Es admin, o
+    # 3. Es contador de la misma empresa
+    es_dueno = db_transaccion.usuario_id == usuario_id
+    es_admin = usuario.rol == "admin"
+    es_contador_misma_empresa = (
+        usuario.rol == "contador"
+        and db_transaccion.empresa_id == usuario.empresa_id
+    )
+
+    if not (es_dueno or es_admin or es_contador_misma_empresa):
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permisos para confirmar esta transacción"
+        )
+
+    # Confirmar
     db_transaccion.estado = models.EstadoTransaccion.CONFIRMADA
     db_transaccion.fecha_confirmacion = datetime.now()
     db.commit()
     db.refresh(db_transaccion)
+
+    # Recargar con la relación usuario para que el schema no falle
+    db_transaccion = db.query(models.Transaccion).options(
+        joinedload(models.Transaccion.usuario)
+    ).filter(models.Transaccion.id == transaccion_id).first()
 
     return db_transaccion
 
