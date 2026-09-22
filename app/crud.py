@@ -7,7 +7,7 @@ import json
 import re
 from typing import List, Optional
 from app.auth import get_password_hash, get_current_user 
-
+from fastapi.exceptions import HTTPException
 
 def get_user(db: Session, user_id: int):
     """Obtiene un usuario por su ID"""
