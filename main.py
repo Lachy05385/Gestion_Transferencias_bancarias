@@ -25,7 +25,7 @@ from fastapi import APIRouter, Request
 from app.models import EstadoTransaccion
 from app.auth import get_password_hash
 from app.auth import verify_password
-from crear_admin import crear_empresa_y_admin
+#from crear_admin import crear_empresa_y_admin
 from app.routers import contratos
 from app.routers import stats
 
